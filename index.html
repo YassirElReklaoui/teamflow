@@ -2112,8 +2112,8 @@
       <summary>Connection settings</summary>
       <div class="note">Connection details are preconfigured for this TeamFlow instance.</div>
       <div class="teamflow-auth-grid">
-        <div class="teamflow-auth-field full"><label>Server URL</label><input id="tfAuthApiUrl" inputmode="url" value="https://teamflow-api.yassir9reklaoui.workers.dev" placeholder="Server address" /></div>
-        <div class="teamflow-auth-field full"><label>Team ID</label><input id="tfAuthWorkspace" value="TEAMFLOW-PROD" placeholder="TEAMFLOW-PROD" /></div>
+        <div class="teamflow-auth-field full"><label>Server URL</label><input id="tfAuthApiUrl" inputmode="url" value="" autocomplete="off" placeholder="https://your-teamflow-server.example" /></div>
+        <div class="teamflow-auth-field full"><label>Team ID</label><input id="tfAuthWorkspace" value="" autocomplete="off" placeholder="e.g. TEAMFLOW-PROD" /></div>
       </div>
       <div class="teamflow-auth-actions"><button id="tfAuthSaveConnection" class="btn" type="button">Save & test connection</button><button id="tfAuthTestConnection" class="btn" type="button">Test</button></div>
     </details>
@@ -2218,8 +2218,8 @@
      TeamFlow secure shared synchronization
      ------------------------------------------------------------------------- */
   const TEAMFLOW_CLOUD_DEFAULTS = {
-    apiBaseUrl: "https://teamflow-api.yassir9reklaoui.workers.dev",
-    workspaceId: "TEAMFLOW-PROD",
+    apiBaseUrl: "",
+    workspaceId: "",
     pollMs: 10000
   };
   const CLOUD_CONFIG_KEY = "teamflow-cloud-config-v1";
@@ -2240,10 +2240,7 @@
   function loadCloudConfig(){
     try{
       const saved=JSON.parse(localStorage.getItem(CLOUD_CONFIG_KEY)||"null")||{};
-      const merged={...TEAMFLOW_CLOUD_DEFAULTS,...saved};
-      if(!String(merged.apiBaseUrl||"").trim())merged.apiBaseUrl=TEAMFLOW_CLOUD_DEFAULTS.apiBaseUrl;
-      if(!String(merged.workspaceId||"").trim())merged.workspaceId=TEAMFLOW_CLOUD_DEFAULTS.workspaceId;
-      return merged;
+      return {...TEAMFLOW_CLOUD_DEFAULTS,...saved};
     }catch(_){return {...TEAMFLOW_CLOUD_DEFAULTS};}
   }
   function saveCloudConfig(){
@@ -2301,7 +2298,7 @@
     gate.classList.remove("hidden");
     document.body.classList.add("teamflow-locked");
     const apiInput=document.getElementById("tfAuthApiUrl"),wsInput=document.getElementById("tfAuthWorkspace");
-    if(apiInput)apiInput.value=cloudConfig.apiBaseUrl||TEAMFLOW_CLOUD_DEFAULTS.apiBaseUrl;if(wsInput)wsInput.value=cloudConfig.workspaceId||"TEAMFLOW-PROD";
+    if(apiInput)apiInput.value=cloudConfig.apiBaseUrl||"";if(wsInput)wsInput.value=cloudConfig.workspaceId||"";
     const status=document.getElementById("tfAuthStatus");if(status)status.textContent=message||"Enter your credentials to continue.";
   }
   function hideAuthGate(){document.getElementById("teamflowAuthGate")?.classList.add("hidden");document.body.classList.remove("teamflow-locked");}
@@ -2347,7 +2344,7 @@
   function saveConnectionFromGate(){
     const api=normalizedApiBase(document.getElementById("tfAuthApiUrl")?.value||"");
     const workspace=(document.getElementById("tfAuthWorkspace")?.value||"").trim();
-    cloudConfig={...cloudConfig,apiBaseUrl:api,workspaceId:workspace||"TEAMFLOW-PROD"};saveCloudConfig();
+    cloudConfig={...cloudConfig,apiBaseUrl:api,workspaceId:workspace};saveCloudConfig();
     clearCloudToken();cloudUser=null;cloudReady=false;setSyncStatus("connecting","Sync · configured");authStatus("Connection settings saved. Testing…");
     checkCloudHealth().catch(err=>authStatus(err.message,"error"));
   }
