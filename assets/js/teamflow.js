@@ -92,7 +92,7 @@
     return {
       tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],documents:[],activity:[],favorites:[],recentTickets:[],
       theme:prefs.theme||"light",currentMember:"",savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},
-      fontSizeByMember:prefs.fontSizeByMember&&typeof prefs.fontSizeByMember==="object"?prefs.fontSizeByMember:{},statusIcons:{},timelinePrefs:prefs.timelinePrefs&&typeof prefs.timelinePrefs==="object"?prefs.timelinePrefs:{},boardWorkflowOrderByMember:{}
+      fontSizeByMember:prefs.fontSizeByMember&&typeof prefs.fontSizeByMember==="object"?prefs.fontSizeByMember:{},statusIcons:{},timelinePrefs:prefs.timelinePrefs&&typeof prefs.timelinePrefs==="object"?prefs.timelinePrefs:{},workflowOrder:clone(DEFAULT_STATUSES)
     };
   }
 
@@ -292,7 +292,7 @@
     if(!next.timelinePrefs||typeof next.timelinePrefs!=="object")next.timelinePrefs={};
     if(!next.wipLimits||typeof next.wipLimits!=="object")next.wipLimits={};
     if(!next.statusIcons||typeof next.statusIcons!=="object")next.statusIcons={};
-    if(!next.boardWorkflowOrderByMember||typeof next.boardWorkflowOrderByMember!=="object"||Array.isArray(next.boardWorkflowOrderByMember))next.boardWorkflowOrderByMember={};
+    if(!Array.isArray(next.workflowOrder)||!next.workflowOrder.length)next.workflowOrder=Array.isArray(next.statuses)?next.statuses.slice():clone(DEFAULT_STATUSES);
     next.theme=next.theme||state.theme||"light";
     next.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.risk)t.risk="None";if(!t.blockerNote)t.blockerNote="";if(!Array.isArray(t.dependencies))t.dependencies=[];if(!Array.isArray(t.comments))t.comments=[];if(!Array.isArray(t.subtasks))t.subtasks=[];if(!Array.isArray(t.links))t.links=[];t.start=normalizeDate(t.start);t.end=normalizeDate(t.end);});
     return next;
@@ -300,16 +300,17 @@
   function syncCurrentMemberToAuthenticatedUser(){
     if(!cloudUser)return false;
     const username=String(cloudUser.username||"").trim().toLowerCase();
-    const displayName=String(cloudUser.displayName||cloudUser.username||"Team member").trim();
-    let member=state.members.find(m=>String(m.authUsername||"").toLowerCase()===username);
-    if(!member)member=state.members.find(m=>String(m.name||"").trim().toLowerCase()===displayName.toLowerCase());
-    if(!member)member=state.members.find(m=>String(m.name||"").trim().toLowerCase()===username);
+    let member=state.members.find(m=>String(m.authUsername||"").trim().toLowerCase()===username);
     let changed=false;
-    if(!member){
-      member={id:`auth-${username||Date.now()}`,name:displayName,role:cloudUser.role==="admin"?"Administrator":"Team member",color:colorForName(displayName),authUsername:username};
+    // Never guess a link from display name. Imported member identities such as
+    // Y.ELREKLAOUI remain stable until an administrator explicitly links them.
+    if(!member && state.members.length===0 && username){
+      const displayName=String(cloudUser.displayName||cloudUser.username||"Team member").trim();
+      member={id:`auth-${username}`,name:displayName,role:cloudUser.role==="admin"?"Administrator":"Team member",color:colorForName(displayName),authUsername:username};
       state.members.push(member);changed=true;
-    }else if(username&&member.authUsername!==username){member.authUsername=username;changed=true;}
-    if(state.currentMember!==member.name){state.currentMember=member.name;changed=true;}
+    }
+    const nextName=member?.name||"";
+    if(state.currentMember!==nextName){state.currentMember=nextName;changed=true;}
     return changed;
   }
 
@@ -384,7 +385,7 @@
     try{if(getCloudToken())await cloudRequest("/auth/logout",{method:"POST"});}catch(err){tfLogError("Logout request failed",err);}
     clearCloudToken();cloudUser=null;cloudReady=false;clearInterval(cloudPollTimer);state=emptySecureState();renderAfterSharedUpdate();showAuthGate("Signed out. Shared data was removed from this browser view.");setSyncStatus("connecting","Sync · sign in");
   }
-  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},boardWorkflowOrderByMember:{}};}
+  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},workflowOrder:clone(DEFAULT_STATUSES)};}
 
   function updateCloudSettingsCard(){
     const apiEl=document.getElementById("cloudSettingsApi"),wsEl=document.getElementById("cloudSettingsWorkspace"),userEl=document.getElementById("cloudSettingsUser"),stateEl=document.getElementById("cloudSettingsState"),manage=document.getElementById("cloudManageUsers");
@@ -395,11 +396,15 @@
     if(manage)manage.style.display=cloudUser?.role==="admin"?"inline-flex":"none";
   }
 
-  async function openCloudUsersModal(){
+  async function openCloudUsersModal(options={}){
     if(cloudUser?.role!=="admin"){toast("Administrator access required");return;}
     let users=[];try{users=(await cloudRequest("/admin/users")).users||[];}catch(err){tfLogError("Loading member access list failed",err);toast(err.message);return;}
     const root=document.getElementById("modalRoot");
     root.innerHTML=`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="TeamFlow member access"><div class="modal access-manager"><div class="modal-head"><div><h2>Team access</h2><div class="note">Create sign-in accounts, set roles and control who can access this TeamFlow workspace.</div></div><button id="closeCloudUsers" class="modal-close" type="button">×</button></div><div class="modal-body"><div class="access-manager-layout"><section class="access-create-panel"><div class="access-panel-title"><h3>Add or update member</h3></div><div class="form-grid"><div class="field"><label>Username</label><input id="cloudUserName" autocomplete="off" placeholder="e.g. john.smith" /></div><div class="field"><label>Display name</label><input id="cloudUserDisplay" autocomplete="off" placeholder="Full name" /></div><div class="field"><label>Role</label><select id="cloudUserRole"><option value="member">Member</option><option value="admin">Administrator</option></select></div><div class="field"><label>Password</label><input id="cloudUserPassword" type="password" autocomplete="new-password" placeholder="Min. 10 characters" /></div></div><div class="note" style="margin:9px 0 13px">For an existing account, leave Password blank to keep the current password.</div><button id="cloudSaveUser" class="btn primary" type="button">＋ Save member</button></section><section class="access-members-panel"><div class="access-panel-title"><h3>Members with access</h3><span class="note" id="cloudUsersCount"></span></div><div id="cloudUsersList" class="access-member-list"></div></section></div></div></div></div>`;
+    const prefill=options.prefill||{};
+    if(prefill.username)document.getElementById("cloudUserName").value=prefill.username;
+    if(prefill.displayName)document.getElementById("cloudUserDisplay").value=prefill.displayName;
+    if(prefill.role)document.getElementById("cloudUserRole").value=prefill.role;
     const renderUsers=()=>{
       const box=document.getElementById("cloudUsersList"),count=document.getElementById("cloudUsersCount");if(!box)return;if(count)count.textContent=`${users.length} account${users.length===1?"":"s"}`;
       box.innerHTML=users.map(u=>`<div class="access-member-card" style="--member-color:${memberColor(u.displayName||u.username)}"><span class="access-member-avatar">${initials(u.displayName||u.username)}</span><div class="access-member-copy"><strong>${esc(u.displayName||u.username)}</strong><small>@${esc(u.username)}</small><span class="access-role-badge ${u.active?"":"disabled"}">${u.active?esc(u.role==="admin"?"Administrator":"Member"):"Disabled"}</span></div><div class="access-member-actions"><button class="btn small cloud-edit-user" data-user="${esc(u.username)}" type="button">Edit</button><button class="btn small cloud-toggle-user" data-user="${esc(u.username)}" data-active="${u.active?"1":"0"}" type="button">${u.active?"Disable":"Enable"}</button></div></div>`).join("")||'<div class="note">No accounts yet.</div>';
@@ -412,8 +417,18 @@
       const username=document.getElementById("cloudUserName")?.value.trim()||"",displayName=document.getElementById("cloudUserDisplay")?.value.trim()||"",role=document.getElementById("cloudUserRole")?.value||"member",password=document.getElementById("cloudUserPassword")?.value||"";
       try{
         const data=await cloudRequest("/admin/users",{method:"POST",body:{username,displayName,role,password,active:true}});users=data.users||[];
-        const memberName=displayName||username;let member=state.members.find(m=>String(m.authUsername||"").toLowerCase()===username.toLowerCase())||state.members.find(m=>String(m.name||"").toLowerCase()===memberName.toLowerCase());
-        if(!member){state.members.push({id:`auth-${username.toLowerCase()}`,name:memberName,role:role==="admin"?"Administrator":"Team member",color:colorForName(memberName),authUsername:username.toLowerCase()});saveState();renderTeam();renderMemberSelects();}else if(!member.authUsername){member.authUsername=username.toLowerCase();saveState();}
+        const normalizedUsername=username.toLowerCase();
+        if(options.linkMemberId){
+          const member=state.members.find(m=>m.id===options.linkMemberId);
+          if(!member)throw new Error("The Team member to link no longer exists.");
+          const other=state.members.find(m=>m.id!==member.id&&String(m.authUsername||"").toLowerCase()===normalizedUsername);
+          if(other)throw new Error(`@${username} is already linked to ${other.name}.`);
+          member.authUsername=normalizedUsername;
+          saveState();syncCurrentMemberToAuthenticatedUser();renderTeam();renderMemberSelects();refreshDataViews();
+          root.innerHTML="";toast(`${member.name} linked to @${username}`);return;
+        }
+        const memberName=displayName||username;let member=state.members.find(m=>String(m.authUsername||"").toLowerCase()===normalizedUsername);
+        if(!member){state.members.push({id:`auth-${normalizedUsername}`,name:memberName,role:role==="admin"?"Administrator":"Team member",color:colorForName(memberName),authUsername:normalizedUsername});saveState();renderTeam();renderMemberSelects();}
         document.getElementById("cloudUserName").value="";document.getElementById("cloudUserDisplay").value="";document.getElementById("cloudUserPassword").value="";document.getElementById("cloudUserRole").value="member";renderUsers();toast("Member access saved");
       }catch(err){tfLogError("Saving member access failed",err,{username});toast(err.message);}
     });
@@ -430,6 +445,7 @@
     document.getElementById("cloudTestConnection")?.addEventListener("click",runCloudSyncCheck);
     document.getElementById("cloudLogout")?.addEventListener("click",cloudLogout);
     document.getElementById("cloudManageUsers")?.addEventListener("click",openCloudUsersModal);
+    const profileBtn=document.getElementById("viewAsAvatarBtn");profileBtn?.addEventListener("click",openPersonalProfileModal);profileBtn?.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPersonalProfileModal();}});
   }
 
   async function initCloudSync(){
@@ -593,8 +609,17 @@
     state.members.forEach(m=>{if(!validMemberColor(m.color)) m.color=colorForName(m.name);});
   }
 
+  const PERSONAL_PROFILE_KEY="teamflow-personal-profile-v1";
+  function personalProfileStore(){try{return JSON.parse(localStorage.getItem(PERSONAL_PROFILE_KEY)||"{}")||{};}catch(err){tfLogError("Reading personal profile preferences failed",err);return {};}}
+  function personalProfile(){const username=String(cloudUser?.username||"").trim().toLowerCase();if(!username)return {};return personalProfileStore()[username]||{};}
+  function savePersonalProfile(profile){const username=String(cloudUser?.username||"").trim().toLowerCase();if(!username)return;const all=personalProfileStore();all[username]={...(all[username]||{}),...profile};try{localStorage.setItem(PERSONAL_PROFILE_KEY,JSON.stringify(all));}catch(err){tfLogError("Saving personal profile preferences failed",err);}renderViewAsAvatarMenu();refreshDataViews();}
+  function linkedMemberForCurrentUser(){const username=String(cloudUser?.username||"").trim().toLowerCase();return username?state.members.find(m=>String(m.authUsername||"").trim().toLowerCase()===username):null;}
+  function personalDisplayName(){const p=personalProfile();return String(p.displayName||cloudUser?.displayName||linkedMemberForCurrentUser()?.name||cloudUser?.username||"TeamFlow").trim();}
+
   function memberColor(name){
     const member=state.members.find(m=>m.name===name);
+    const linked=linkedMemberForCurrentUser();
+    if(linked&&member&&linked.id===member.id){const own=validMemberColor(personalProfile().color);if(own)return own;}
     return validMemberColor(member?.color) || colorForName(name);
   }
 
@@ -728,15 +753,11 @@
   }
 
   function normalizeWorkflowOrder(){
-    // Shared workflow identities are kept stable. This function never reorders them.
-    if(!Array.isArray(state.statuses)||!state.statuses.length){state.statuses=clone(DEFAULT_STATUSES);return;}
+    // Workflow identity is shared by name; visual order is a separate admin-controlled list.
+    if(!Array.isArray(state.statuses)||!state.statuses.length)state.statuses=clone(DEFAULT_STATUSES);
     const seen=new Set();
-    state.statuses=state.statuses.map(x=>String(x||"").trim()).filter(name=>{
-      if(!name)return false;
-      const key=name.toLowerCase();
-      if(seen.has(key))return false;
-      seen.add(key);return true;
-    });
+    state.statuses=state.statuses.map(x=>String(x||"").trim()).filter(name=>{if(!name)return false;const key=name.toLowerCase();if(seen.has(key))return false;seen.add(key);return true;});
+    ensureSharedWorkflowOrder();
   }
 
   function splitList(value){
@@ -822,34 +843,26 @@
   }
 
 
-  function boardWorkflowOrderKey(memberName=state.currentMember){
-    const username=String(cloudUser?.username||"").trim().toLowerCase();
-    if(username)return `auth:${username}`;
-    const member=state.members.find(m=>m.name===memberName)||state.members[0];
-    return member?.id||`member:${String(memberName||"default").trim().toLowerCase()}`;
-  }
-
-  function ensureBoardWorkflowOrder(memberName=state.currentMember){
-    if(!state.boardWorkflowOrderByMember||typeof state.boardWorkflowOrderByMember!=="object"||Array.isArray(state.boardWorkflowOrderByMember))state.boardWorkflowOrderByMember={};
-    const key=boardWorkflowOrderKey(memberName);
-    const canonical=Array.isArray(state.statuses)?state.statuses.slice():clone(DEFAULT_STATUSES);
-    let order=Array.isArray(state.boardWorkflowOrderByMember[key])?state.boardWorkflowOrderByMember[key].slice():canonical.slice();
+  function ensureSharedWorkflowOrder(){
+    const canonical=Array.isArray(state.statuses)&&state.statuses.length?state.statuses.slice():clone(DEFAULT_STATUSES);
+    let order=Array.isArray(state.workflowOrder)?state.workflowOrder.slice():canonical.slice();
     order=order.filter((name,index)=>canonical.includes(name)&&order.indexOf(name)===index);
     canonical.forEach(name=>{if(!order.includes(name))order.push(name);});
-    state.boardWorkflowOrderByMember[key]=order;
+    state.workflowOrder=order;
     return order;
   }
 
-  function moveBoardWorkflow(statusName,direction){
-    const order=ensureBoardWorkflowOrder();
+  function moveSharedWorkflow(statusName,direction){
+    if(cloudUser?.role!=="admin"){toast("Administrator access required");return false;}
+    const order=ensureSharedWorkflowOrder();
     const index=order.indexOf(statusName);
     if(index<0)return false;
     const nextIndex=direction==='up'?index-1:direction==='down'?index+1:index;
     if(nextIndex<0||nextIndex>=order.length||nextIndex===index)return false;
     [order[index],order[nextIndex]]=[order[nextIndex],order[index]];
-    state.boardWorkflowOrderByMember[boardWorkflowOrderKey()]=order;
+    state.workflowOrder=order;
     saveState();
-    tfLog('info','Personal board workflow order changed',{user:boardWorkflowOrderKey(),status:statusName,direction,order:[...order]});
+    tfLog('info','Shared workflow order changed',{admin:cloudUser?.username||'',status:statusName,direction,order:[...order]});
     return true;
   }
 
@@ -861,7 +874,7 @@
     if(!state.wipLimits || typeof state.wipLimits!=="object" || Array.isArray(state.wipLimits)) state.wipLimits={};
     if(!state.fontSizeByMember || typeof state.fontSizeByMember!=="object" || Array.isArray(state.fontSizeByMember)) state.fontSizeByMember={};
     if(!state.statusIcons || typeof state.statusIcons!=="object" || Array.isArray(state.statusIcons)) state.statusIcons={};
-    if(!state.boardWorkflowOrderByMember || typeof state.boardWorkflowOrderByMember!=="object" || Array.isArray(state.boardWorkflowOrderByMember)) state.boardWorkflowOrderByMember={};
+    if(!Array.isArray(state.workflowOrder)) state.workflowOrder=[];
     if(!state.timelinePrefs || typeof state.timelinePrefs!=="object" || Array.isArray(state.timelinePrefs)) state.timelinePrefs={};
     const tp=state.timelinePrefs;
     if(!["gantt","list"].includes(tp.mode)) tp.mode="gantt";
@@ -872,8 +885,7 @@
     if(!tp.filters || typeof tp.filters!=="object" || Array.isArray(tp.filters)) tp.filters={};
     ["assignee","status","release","type"].forEach(k=>{if(typeof tp.filters[k]!=="string") tp.filters[k]="";});
     if(!tp.collapsed || typeof tp.collapsed!=="object" || Array.isArray(tp.collapsed)) tp.collapsed={};
-    Object.keys(state.boardWorkflowOrderByMember).forEach(key=>{const order=Array.isArray(state.boardWorkflowOrderByMember[key])?state.boardWorkflowOrderByMember[key]:[];state.boardWorkflowOrderByMember[key]=order.filter((name,index)=>state.statuses.includes(name)&&order.indexOf(name)===index);state.statuses.forEach(name=>{if(!state.boardWorkflowOrderByMember[key].includes(name))state.boardWorkflowOrderByMember[key].push(name);});});
-    ensureBoardWorkflowOrder();
+    ensureSharedWorkflowOrder();
     state.statuses.forEach(status=>{if(!state.statusIcons[status]) state.statusIcons[status]=DEFAULT_STATUS_ICONS[status]||"circle";});
     Object.keys(state.statusIcons).forEach(status=>{if(!state.statuses.includes(status)) delete state.statusIcons[status];});
     state.tickets.forEach(t=>{
@@ -1291,7 +1303,7 @@
     const viewAs = $("#viewAs");
     syncCurrentMemberToAuthenticatedUser();
     const names = state.members.map(m=>m.name);
-    const currentName = state.currentMember && names.includes(state.currentMember) ? state.currentMember : names[0] || "";
+    const currentName = state.currentMember && names.includes(state.currentMember) ? state.currentMember : (cloudUser?"":(names[0]||""));
     state.currentMember = currentName;
     if(viewAs)viewAs.innerHTML = currentName?`<option selected>${esc(currentName)}</option>`:"";
     renderViewAsAvatarMenu();
@@ -1322,14 +1334,25 @@
     const btn=$("#viewAsAvatarBtn"),avatar=$("#viewAsAvatar"),menu=$("#viewAsAvatarMenu"),nameEl=$("#connectedUserName"),roleEl=$("#connectedUserRole");
     if(!btn||!avatar)return;
     syncCurrentMemberToAuthenticatedUser();
-    const current=state.members.find(m=>m.name===state.currentMember)||state.members[0];
-    const display=cloudUser?.displayName||current?.name||cloudUser?.username||"TeamFlow";
+    const current=linkedMemberForCurrentUser();
+    const display=personalDisplayName();
     avatar.textContent=initials(display);
-    avatar.style.setProperty('--member-color',current?.color||memberColor(display));
+    avatar.style.setProperty('--member-color',current?memberColor(current.name):(validMemberColor(personalProfile().color)||colorForName(display)));
     if(nameEl)nameEl.textContent=display;
-    if(roleEl)roleEl.textContent=cloudUser?.role==="admin"?"Administrator":"Member";
-    btn.title=`Signed in as ${display}`;
+    if(roleEl)roleEl.textContent=current?`${cloudUser?.role==="admin"?"Administrator":"Member"} · ${current.name}`:(cloudUser?"Account not linked":"Signed out");
+    btn.title=current?`Signed in as ${display} · linked to ${current.name}`:`Signed in as ${display} · account not linked to a Team member`;
+    btn.setAttribute('role','button');btn.setAttribute('tabindex','0');
     if(menu)menu.classList.add("hidden");
+  }
+
+  function openPersonalProfileModal(){
+    if(!cloudUser){toast("Sign in first");return;}
+    const p=personalProfile(),linked=linkedMemberForCurrentUser(),display=personalDisplayName(),color=validMemberColor(p.color)||memberColor(linked?.name||display);
+    $("#modalRoot").innerHTML=`<div class="modal-backdrop" role="dialog" aria-modal="true"><div class="modal" style="max-width:540px"><div class="modal-head"><h2>My profile</h2><button id="closeModal" class="modal-close" type="button">×</button></div><div class="modal-body"><div class="form-grid"><div class="field full"><label>My display name</label><input id="personalDisplayName" value="${esc(display)}" /></div><div class="field full"><label>My color</label><div class="member-color-picker"><div id="personalColorPreview" class="member-color-preview" style="--member-color:${color}">${initials(display)}</div><div class="member-color-controls"><input id="personalColor" type="color" value="${color}" /> <div class="color-swatches">${MEMBER_COLOR_PALETTE.map(c=>`<button class="color-swatch" type="button" data-personal-color="${c}" style="--swatch:${c}"></button>`).join('')}</div></div></div></div><div class="field full"><div class="note">These are your personal display preferences. ${linked?`Your account is linked to shared member <b>${esc(linked.name)}</b>.`:'Your login is not linked to a Team member yet.'}</div></div></div></div><div class="modal-actions"><div class="spacer"></div><button id="cancelPersonalProfile" class="btn" type="button">Cancel</button><button id="savePersonalProfile" class="btn primary" type="button">Save my profile</button></div></div></div>`;
+    const close=()=>$("#modalRoot").innerHTML="";$("#closeModal").onclick=close;$("#cancelPersonalProfile").onclick=close;
+    const refresh=()=>{const name=$("#personalDisplayName").value.trim()||display;$("#personalColorPreview").textContent=initials(name);$("#personalColorPreview").style.setProperty('--member-color',$("#personalColor").value);};
+    $("#personalDisplayName").oninput=refresh;$("#personalColor").oninput=refresh;$$('[data-personal-color]').forEach(b=>b.onclick=()=>{$("#personalColor").value=b.dataset.personalColor;refresh();});
+    $("#savePersonalProfile").onclick=()=>{const nextName=$("#personalDisplayName").value.trim();if(!nextName){$("#personalDisplayName").focus();return;}savePersonalProfile({displayName:nextName,color:$("#personalColor").value});close();toast("Your profile preferences were updated");};
   }
 
   function renderBoardHeroStats(){
@@ -1500,7 +1523,7 @@
     }
 
     function buildColumns(list,container){
-      const boardOrder=ensureBoardWorkflowOrder();
+      const boardOrder=ensureSharedWorkflowOrder();
       boardOrder.forEach(statusName=>{
         const tickets=list.filter(t=>t.status===statusName);const limit=wipLimitFor(statusName);const exceeded=limit&&tickets.length>limit;const col=document.createElement('section');col.className='column'+(exceeded?' wip-exceeded':'');col.dataset.status=statusName;col.innerHTML=`<div class="column-head">${workflowIcon(statusName)}<strong>${esc(statusName)}</strong><span class="count">${tickets.length}${limit?` / ${limit}`:''}</span>${exceeded?'<span class="wip-warning">WIP exceeded</span>':''}<button class="add" type="button" aria-label="Add ticket">＋</button></div><div class="cards"></div>`;$('.add',col).onclick=()=>openTicketModal(null,statusName);const cards=$('.cards',col);tickets.forEach(t=>cards.appendChild(makeTicket(t)));if(!tickets.length)cards.innerHTML='<div class="empty">No matching tickets</div>';
         if(!bulkMode){col.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';col.classList.add('drag-over');});col.addEventListener('dragleave',e=>{if(!col.contains(e.relatedTarget))col.classList.remove('drag-over');});col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('drag-over');const id=e.dataTransfer.getData('text/plain');const ticket=state.tickets.find(t=>t.id===id);if(ticket&&ticket.status!==statusName){const old=ticket.status;ticket.status=statusName;ticket.history=ticket.history||[];ticket.history.unshift(`Status changed to ${statusName}`);logActivity('move',ticket,`Moved ${old} → ${statusName}`);saveState();refreshDataViews();toast(`${id} moved to ${statusName}`);}});}
@@ -1530,52 +1553,48 @@
   }
 
   function renderTeam(){
+    const isAdmin=cloudUser?.role==="admin";
+    const linkedSelf=linkedMemberForCurrentUser();
     $("#teamGrid").innerHTML = state.members.map(m=>`
       <div class="member-card" style="--member-color:${memberColor(m.name)}">
         <div class="member-avatar">${initials(m.name)}</div>
         <div class="member-info">
           <strong>${esc(m.name)}</strong>
           <small>${esc(m.role || "Team member")}</small>
-          <div class="member-color-line"><span class="member-color-dot"></span><span>Ticket identity color</span></div>
+          <div class="member-color-line"><span class="member-color-dot"></span><span>${m.authUsername?`Linked to @${esc(m.authUsername)}`:'Not linked to a login user'}</span></div>
         </div>
-        <button class="btn small" type="button" data-edit-member="${esc(m.id)}">Edit</button>
+        <button class="btn small" type="button" data-edit-member="${esc(m.id)}">${isAdmin?'Manage':linkedSelf?.id===m.id?'My profile':'View'}</button>
       </div>
     `).join("");
-
-    $$("[data-edit-member]").forEach(btn=>{
-      btn.addEventListener("click",()=>{
-        const member = state.members.find(m=>m.id===btn.dataset.editMember);
-        if(member) openMemberModal(member.id);
-      });
-    });
+    $$('[data-edit-member]').forEach(btn=>btn.addEventListener('click',()=>{const member=state.members.find(m=>m.id===btn.dataset.editMember);if(!member)return;if(isAdmin)openMemberModal(member.id);else if(linkedSelf?.id===member.id)openPersonalProfileModal();else openMemberModal(member.id,{readOnly:true});}));
   }
 
   function renderStatusEditor(){
-    const order=ensureBoardWorkflowOrder();
+    const order=ensureSharedWorkflowOrder();
+    const isAdmin=cloudUser?.role==="admin";
     $("#statusEditor").innerHTML = order.map((statusName,i)=>{
       const count=state.tickets.filter(t=>t.status===statusName).length;
       const sharedIndex=state.statuses.indexOf(statusName);
       return `
       <div class="status-setting-row">
-        <div class="status-setting-main"><span class="settings-workflow-icon">${workflowIconSvg(workflowIconKey(statusName))}</span><div><strong>${esc(statusName)}</strong><small>${count} ticket${count===1?"":"s"} · ${esc(WORKFLOW_ICON_LIBRARY[workflowIconKey(statusName)]?.label||"General")} · Personal board position ${i+1}</small></div></div>
+        <div class="status-setting-main"><span class="settings-workflow-icon">${workflowIconSvg(workflowIconKey(statusName))}</span><div><strong>${esc(statusName)}</strong><small>${count} ticket${count===1?"":"s"} · ${esc(WORKFLOW_ICON_LIBRARY[workflowIconKey(statusName)]?.label||"General")} · Shared position ${i+1}</small></div></div>
         <div class="work-order-actions">
-          <button class="btn small" type="button" data-board-status-move="up" data-board-status="${esc(statusName)}" ${i===0?"disabled":""} title="Move left on my Board">←</button>
-          <button class="btn small" type="button" data-board-status-move="down" data-board-status="${esc(statusName)}" ${i===order.length-1?"disabled":""} title="Move right on my Board">→</button>
-          <button class="btn small status-remove-btn" type="button" data-remove-status="${sharedIndex}" ${state.statuses.length<=1?"disabled":""}>Remove</button>
+          ${isAdmin?`<button class="btn small" type="button" data-board-status-move="up" data-board-status="${esc(statusName)}" ${i===0?"disabled":""} title="Move workflow left for everyone">←</button>
+          <button class="btn small" type="button" data-board-status-move="down" data-board-status="${esc(statusName)}" ${i===order.length-1?"disabled":""} title="Move workflow right for everyone">→</button>`:'<span class="note">Admin controlled</span>'}
+          ${isAdmin?`<button class="btn small status-remove-btn" type="button" data-remove-status="${sharedIndex}" ${state.statuses.length<=1?"disabled":""}>Remove</button>`:''}
         </div>
       </div>`;
     }).join("");
 
     $$('[data-board-status-move]').forEach(btn=>btn.addEventListener('click',()=>{
-      if(moveBoardWorkflow(btn.dataset.boardStatus,btn.dataset.boardStatusMove)){renderStatusEditor();renderBoard();toast(`${btn.dataset.boardStatus} moved on your Board`);}
+      if(moveSharedWorkflow(btn.dataset.boardStatus,btn.dataset.boardStatusMove)){renderStatusEditor();renderBoard();toast(`${btn.dataset.boardStatus} moved for everyone`);}
     }));
-    $$('[data-remove-status]').forEach(btn=>{
-      btn.addEventListener("click",()=>openRemoveWorkflowModal(Number(btn.dataset.removeStatus)));
-    });
+    $$('[data-remove-status]').forEach(btn=>btn.addEventListener("click",()=>openRemoveWorkflowModal(Number(btn.dataset.removeStatus))));
     renderSettingsSummary();
   }
 
   function openRemoveWorkflowModal(index){
+    if(cloudUser?.role!=="admin"){toast("Administrator access required");return;}
     const workflow=state.statuses[index];
     if(!workflow) return;
     const alternatives=state.statuses.filter((_,i)=>i!==index);
@@ -1618,7 +1637,7 @@
         ticket.history.unshift(`Workflow "${workflow}" removed; moved to ${destination}`);
       });
       state.statuses.splice(index,1);
-      if(state.boardWorkflowOrderByMember&&typeof state.boardWorkflowOrderByMember==='object'){Object.keys(state.boardWorkflowOrderByMember).forEach(key=>{state.boardWorkflowOrderByMember[key]=(state.boardWorkflowOrderByMember[key]||[]).filter(name=>name!==workflow);});}
+      state.workflowOrder=ensureSharedWorkflowOrder().filter(name=>name!==workflow);
       if(state.statusIcons) delete state.statusIcons[workflow];
       ensureMyWorkPrefs();
       saveState();
@@ -2339,8 +2358,24 @@
     });
   }
 
-  function openMemberModal(memberId=null){
+  function suggestedUsernameFromMember(member){return String(member?.name||"").toLowerCase().replace(/[^a-z0-9]+/g,'.').replace(/^\.+|\.+$/g,'').slice(0,40)||"member";}
+
+  async function openMemberAccountLinkModal(memberId){
+    if(cloudUser?.role!=="admin"){toast("Administrator access required");return;}
+    const member=state.members.find(m=>m.id===memberId);if(!member)return;
+    let users=[];try{users=(await cloudRequest("/admin/users")).users||[];}catch(err){tfLogError("Loading login users for member linking failed",err,{memberId});toast(err.message);return;}
+    const linkedElsewhere=new Map(state.members.filter(m=>m.id!==member.id&&m.authUsername).map(m=>[String(m.authUsername).toLowerCase(),m.name]));
+    const available=users.filter(u=>!linkedElsewhere.has(String(u.username||'').toLowerCase())||String(u.username||'').toLowerCase()===String(member.authUsername||'').toLowerCase());
+    $("#modalRoot").innerHTML=`<div class="modal-backdrop" role="dialog" aria-modal="true"><div class="modal" style="max-width:560px"><div class="modal-head"><h2>Link login user</h2><button id="closeModal" class="modal-close" type="button">×</button></div><div class="modal-body"><p class="panel-sub">Link <strong>${esc(member.name)}</strong> to one authentication account. Tickets remain assigned to the member name; the linked account receives “Assigned to me” and My Work ownership.</p><div class="field"><label>Login account</label><select id="memberLoginAccount"><option value="">Choose an account…</option>${available.map(u=>`<option value="${esc(u.username)}" ${String(u.username).toLowerCase()===String(member.authUsername||'').toLowerCase()?'selected':''}>${esc(u.displayName||u.username)} (@${esc(u.username)})</option>`).join('')}</select></div>${!available.length?'<div class="note" style="margin-top:10px">No unlinked login accounts are available. Create one for this member instead.</div>':''}</div><div class="modal-actions"><button id="createUserForMember" class="btn" type="button">＋ Create user for member</button><div class="spacer"></div><button id="cancelMemberLink" class="btn" type="button">Cancel</button><button id="saveMemberLink" class="btn primary" type="button">Link account</button></div></div></div>`;
+    const close=()=>$("#modalRoot").innerHTML="";$("#closeModal").onclick=close;$("#cancelMemberLink").onclick=close;
+    $("#createUserForMember").onclick=()=>openCloudUsersModal({linkMemberId:member.id,prefill:{username:suggestedUsernameFromMember(member),displayName:member.name,role:"member"}});
+    $("#saveMemberLink").onclick=()=>{const username=$("#memberLoginAccount").value.trim().toLowerCase();if(!username){$("#memberLoginAccount").focus();return;}if(state.members.some(m=>m.id!==member.id&&String(m.authUsername||'').toLowerCase()===username)){toast("That login account is already linked to another Team member");return;}member.authUsername=username;saveState();syncCurrentMemberToAuthenticatedUser();renderTeam();renderMemberSelects();refreshDataViews();close();toast(`${member.name} linked to @${username}`);};
+  }
+
+  function openMemberModal(memberId=null,options={}){
     const existing = memberId ? state.members.find(m=>m.id===memberId) : null;
+    const readOnly=!!options.readOnly;
+    const isAdmin=cloudUser?.role==="admin";
     const initialColor=validMemberColor(existing?.color) || colorForName(existing?.name || `member-${state.members.length+1}`);
     const initialName=existing?.name||"";
     $("#modalRoot").innerHTML = `
@@ -2354,6 +2389,7 @@
             <div class="form-grid">
               <div class="field full"><label>Name *</label><input id="memberName" value="${esc(initialName)}" /></div>
               <div class="field full"><label>Role</label><input id="memberRole" value="${esc(existing?.role||"")}" placeholder="Developer, QA, Architect..." /></div>
+              ${existing&&isAdmin?`<div class="field full"><label>Login account link</label><div class="note">${existing.authUsername?`Linked to <b>@${esc(existing.authUsername)}</b>`:'Not linked to a login user.'}</div><div style="display:flex;gap:8px;margin-top:8px"><button id="linkMemberAccount" class="btn small" type="button">${existing.authUsername?'Change link':'Link existing user'}</button><button id="createMemberLogin" class="btn small" type="button">＋ Create user</button>${existing.authUsername?'<button id="unlinkMemberAccount" class="btn small danger" type="button">Unlink</button>':''}</div></div>`:''}
               <div class="field full">
                 <label>Preferred ticket identity color</label>
                 <div class="member-color-picker">
@@ -2368,10 +2404,10 @@
             </div>
           </div>
           <div class="modal-actions">
-            ${existing?'<button id="removeMember" class="btn danger" type="button">Remove</button>':""}
+            ${existing&&isAdmin?'<button id="removeMember" class="btn danger" type="button">Remove</button>':""}
             <div class="spacer"></div>
             <button id="cancelMember" class="btn" type="button">Cancel</button>
-            <button id="saveMember" class="btn primary" type="button">${existing?"Save Changes":"Add Member"}</button>
+            ${readOnly?"":`<button id="saveMember" class="btn primary" type="button">${existing?"Save Changes":"Add Member"}</button>`}
           </div>
         </div>
       </div>
@@ -2388,7 +2424,13 @@
     $("#memberColor").addEventListener("input",updatePreview);
     $("#memberName").addEventListener("input",updatePreview);
     $$('[data-member-color]').forEach(btn=>btn.addEventListener('click',()=>{$("#memberColor").value=btn.dataset.memberColor;updatePreview();}));
-    $("#saveMember").addEventListener("click",()=>{
+    if(readOnly){["memberName","memberRole","memberColor"].forEach(id=>{const el=$("#"+id);if(el)el.disabled=true;});}
+    if(existing&&isAdmin){
+      $("#linkMemberAccount")?.addEventListener("click",()=>openMemberAccountLinkModal(existing.id));
+      $("#createMemberLogin")?.addEventListener("click",()=>openCloudUsersModal({linkMemberId:existing.id,prefill:{username:suggestedUsernameFromMember(existing),displayName:existing.name,role:"member"}}));
+      $("#unlinkMemberAccount")?.addEventListener("click",()=>{const old=existing.authUsername||"";existing.authUsername="";if(String(cloudUser?.username||"").toLowerCase()===String(old).toLowerCase())state.currentMember="";saveState();renderTeam();renderMemberSelects();refreshDataViews();close();toast(`${existing.name} unlinked from @${old}`);});
+    }
+    $("#saveMember")?.addEventListener("click",()=>{
       const name=$("#memberName").value.trim();
       if(!name){$("#memberName").focus();toast("Member name is required");return;}
       const role=$("#memberRole").value.trim() || "Team member";
@@ -2953,6 +2995,7 @@
   })();
 
   function createWorkflowStep(options={}){
+    if(cloudUser?.role!=="admin"){toast("Administrator access required");return;}
     ensureAdvancedState();
     const prefill=String(options.prefillName||"").trim();
     let selectedIcon=options.iconKey && WORKFLOW_ICON_LIBRARY[options.iconKey] ? options.iconKey : "circle";
@@ -2989,11 +3032,11 @@
         const index=state.statuses.indexOf(after);
         state.statuses.splice(index>=0?index+1:state.statuses.length,0,clean);
       }
-      const personalOrder=ensureBoardWorkflowOrder();
-      personalOrder.splice(personalOrder.indexOf(clean),1);
-      if(after==="__end__")personalOrder.push(clean);
-      else{const personalAfter=personalOrder.indexOf(after);personalOrder.splice(personalAfter>=0?personalAfter+1:personalOrder.length,0,clean);}
-      state.boardWorkflowOrderByMember[boardWorkflowOrderKey()]=personalOrder;
+      const sharedOrder=ensureSharedWorkflowOrder();
+      const existingPos=sharedOrder.indexOf(clean);if(existingPos>=0)sharedOrder.splice(existingPos,1);
+      if(after==="__end__")sharedOrder.push(clean);
+      else{const sharedAfter=sharedOrder.indexOf(after);sharedOrder.splice(sharedAfter>=0?sharedAfter+1:sharedOrder.length,0,clean);}
+      state.workflowOrder=sharedOrder;
       if(!state.statusIcons||typeof state.statusIcons!=="object") state.statusIcons={};
       state.statusIcons[clean]=selectedIcon;
       normalizeWorkflowOrder();
@@ -3217,7 +3260,7 @@
       if(!Array.isArray(imported.tickets)||!Array.isArray(imported.members)||!Array.isArray(imported.statuses)) throw new Error("Invalid format");
       state={...state,...imported,documents:Array.isArray(imported.documents)?imported.documents:[]};
       if(!Array.isArray(state.releases)) state.releases=[];
-      if(!state.boardWorkflowOrderByMember||typeof state.boardWorkflowOrderByMember!=="object"||Array.isArray(state.boardWorkflowOrderByMember))state.boardWorkflowOrderByMember={};
+      if(!Array.isArray(state.workflowOrder)||!state.workflowOrder.length)state.workflowOrder=state.statuses.slice();
       state.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.release)t.release=t.sprint||state.releases[0]||"";if(!t.risk)t.risk="None";if(!Array.isArray(t.dependencies))t.dependencies=[];});
       activeDocId=state.documents[0]?.id||null;ensureAdvancedState();
       saveState();setTheme(state.theme);renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderBackups();renderDocuments();renderOverview();renderTimeline();
@@ -3270,7 +3313,7 @@
     if(!ok)return;
     state={
       tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state.theme,currentMember:"",documents:[],
-      activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},wipLimits:{},fontSizeByMember:{},statusIcons:{},timelinePrefs:{},boardWorkflowOrderByMember:{}
+      activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},wipLimits:{},fontSizeByMember:{},statusIcons:{},timelinePrefs:{},workflowOrder:clone(DEFAULT_STATUSES)
     };
     activeDocId=null;
     try{localStorage.removeItem(BACKUP_KEY);}catch(_){}
