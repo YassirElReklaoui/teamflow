@@ -41,6 +41,45 @@
   const $$ = (s,root=document) => Array.from(root.querySelectorAll(s));
   const clone = obj => JSON.parse(JSON.stringify(obj));
 
+
+  /* -------------------------------------------------------------------------
+     TeamFlow diagnostics
+     Keep user-facing messages concise while preserving technical details in
+     DevTools so failures can be diagnosed without changing the UI flow.
+     ------------------------------------------------------------------------- */
+  const TF_LOG_PREFIX = "[TeamFlow]";
+
+  function tfLog(level,context,details){
+    const method=console[level] || console.log;
+    const stamp=new Date().toISOString();
+    if(details===undefined) method.call(console,`${TF_LOG_PREFIX} ${stamp} ${context}`);
+    else method.call(console,`${TF_LOG_PREFIX} ${stamp} ${context}`,details);
+  }
+
+  function tfLogError(context,error,extra){
+    const err=error instanceof Error ? error : new Error(String(error ?? "Unknown error"));
+    const details={
+      name:err.name,
+      message:err.message,
+      stack:err.stack,
+      ...(extra&&typeof extra==="object"?extra:{})
+    };
+    tfLog("error",context,details);
+    return err;
+  }
+
+  window.addEventListener("error",event=>{
+    tfLogError("Uncaught JavaScript error",event.error || event.message,{
+      source:event.filename||"",
+      line:event.lineno||0,
+      column:event.colno||0
+    });
+  });
+
+  window.addEventListener("unhandledrejection",event=>{
+    tfLogError("Unhandled promise rejection",event.reason);
+  });
+
   function esc(v){
     return String(v == null ? "" : v).replace(/[&<>"']/g, ch => ({
       "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
@@ -164,8 +203,8 @@
       cache:"no-store"
     });
     const text=await response.text();let data={};
-    try{data=text?JSON.parse(text):{};}catch(_){data={error:text||`HTTP ${response.status}`};}
-    if(!response.ok){const err=Object.assign(new Error(data.error||`HTTP ${response.status}`),{status:response.status,data});throw err;}
+    try{data=text?JSON.parse(text):{};}catch(err){tfLogError("API response JSON parsing failed",err,{path,status:response.status,responseText:text.slice(0,500)});data={error:text||`HTTP ${response.status}`};}
+    if(!response.ok){const err=Object.assign(new Error(data.error||`HTTP ${response.status}`),{status:response.status,data});tfLogError("API request failed",err,{path,method,status:response.status});throw err;}
     return data;
   }
 
@@ -216,7 +255,7 @@
       const data=await cloudRequest("/auth/login",{method:"POST",auth:false,body:{workspaceId:cloudConfig.workspaceId,username,password,remember}});
       storeCloudToken(data.token,remember);cloudUser=data.user;hideAuthGate();
       await connectCloudWorkspace();toast(`Signed in as ${cloudUser.displayName||cloudUser.username}`);
-    }catch(err){authStatus(err.message||"Sign-in failed","error");}
+    }catch(err){tfLogError("Authentication login failed",err,{workspaceId:cloudConfig.workspaceId||""});authStatus(err.message||"Sign-in failed","error");}
   }
   async function cloudBootstrap(){
     const setupKey=document.getElementById("tfSetupKey")?.value||"";
@@ -230,7 +269,7 @@
     try{
       const data=await cloudRequest("/setup/bootstrap",{method:"POST",auth:false,body:{workspaceId:cloudConfig.workspaceId,setupKey,username,displayName,password,remember:true}});
       storeCloudToken(data.token,true);cloudUser=data.user;hideAuthGate();await connectCloudWorkspace();toast("TeamFlow activated");
-    }catch(err){authStatus(err.message||"Setup failed","error");}
+    }catch(err){tfLogError("Workspace bootstrap failed",err,{workspaceId:cloudConfig.workspaceId||""});authStatus(err.message||"Setup failed","error");}
   }
   function saveConnectionFromGate(){
     const api=normalizedApiBase(document.getElementById("tfAuthApiUrl")?.value||"");
@@ -238,7 +277,7 @@
     if(!api||!workspace){authStatus(!api&&!workspace?"Enter the Server URL and Workspace ID first.":(!api?"Enter the Server URL first.":"Enter your Workspace ID first."),"error");return;}
     cloudConfig={...cloudConfig,apiBaseUrl:api,workspaceId:workspace};saveCloudConfig();
     clearCloudToken();cloudUser=null;cloudReady=false;setSyncStatus("connecting","Sync · configured");authStatus("Connection settings saved. Testing…");
-    checkCloudHealth().catch(err=>authStatus(err.message,"error"));
+    checkCloudHealth().catch(err=>{tfLogError("Connection health check failed",err,{apiBaseUrl:normalizedApiBase(cloudConfig.apiBaseUrl),workspaceId:cloudConfig.workspaceId||""});authStatus(err.message,"error");});
   }
 
   function normalizeCloudState(remote){
@@ -290,7 +329,7 @@
       setSyncStatus("updated","Sync · updated",`Version ${cloudVersion}${cloudLastStamp?` · ${new Date(cloudLastStamp).toLocaleTimeString()}`:""}`);
       setTimeout(()=>{if(!cloudSaving)setSyncStatus("connected","Sync · connected");},1200);
       return data;
-    }catch(err){cloudApplyingRemote=false;cloudLastError=String(err?.message||err);setSyncStatus("error","Sync · error",cloudLastError);if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your TeamFlow session expired. Sign in again.");}else if(!quiet)toast("Sync unavailable");return null;}
+    }catch(err){cloudApplyingRemote=false;cloudLastError=String(err?.message||err);tfLogError("Loading shared workspace failed",err,{quiet,cloudVersion});setSyncStatus("error","Sync · error",cloudLastError);if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your TeamFlow session expired. Sign in again.");}else if(!quiet)toast("Sync unavailable");return null;}
   }
   function serializableCloudState(){
     const copy=clone(state);copy.documents=(copy.documents||[]).filter(d=>d.kind!=="pdf-local").map(d=>{delete d.runtimeUrl;return d;});return copy;
@@ -308,7 +347,7 @@
       cloudLastError=String(err?.message||err);
       if(err.status===409){setSyncStatus("error","Sync · newer data found","Another user saved first. TeamFlow is reloading the latest shared version to prevent an overwrite.");toast("Newer shared changes found — reloading");await loadRemoteWorkspace({quiet:true});}
       else if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your session expired. Sign in again.");}
-      else{console.error("TeamFlow save failed",err);setSyncStatus("error","Sync · save failed",cloudLastError);toast("Could not save shared changes");}
+      else{tfLogError("Saving shared workspace failed",err,{cloudVersion});setSyncStatus("error","Sync · save failed",cloudLastError);toast("Could not save shared changes");}
       return false;
     }finally{cloudSaving=false;if(cloudDirty&&cloudReady){cloudDirty=false;scheduleRemoteSave();}}
   }
@@ -316,7 +355,7 @@
   async function pollCloud(){
     if(document.hidden||cloudSaving||cloudApplyingRemote||cloudDirty||!cloudReady)return;
     try{const info=await cloudRequest(`/changes?since=${encodeURIComponent(cloudVersion)}`);if(info.changed)await loadRemoteWorkspace({quiet:true});}
-    catch(err){cloudLastError=String(err?.message||err);if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your session expired. Sign in again.");}else setSyncStatus("error","Sync · error",cloudLastError);}
+    catch(err){cloudLastError=String(err?.message||err);tfLogError("Cloud polling failed",err,{cloudVersion});if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your session expired. Sign in again.");}else setSyncStatus("error","Sync · error",cloudLastError);}
   }
   async function connectCloudWorkspace(){
     setSyncStatus("connecting","Sync · connecting…");
@@ -326,7 +365,7 @@
       setSyncStatus("connected","Sync · connected",`Signed in as ${cloudUser.displayName||cloudUser.username}`);
       clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,Number(cloudConfig.pollMs||10000));
       updateCloudSettingsCard();
-    }catch(err){cloudReady=false;clearCloudToken();showAuthGate(err.message||"Sign in to TeamFlow");setSyncStatus("error","Sync · sign in required",String(err?.message||err));}
+    }catch(err){tfLogError("Connecting to shared workspace failed",err);cloudReady=false;clearCloudToken();showAuthGate(err.message||"Sign in to TeamFlow");setSyncStatus("error","Sync · sign in required",String(err?.message||err));}
   }
   async function runCloudSyncCheck(){
     ensureSyncBadge();setSyncStatus("connecting","Sync · checking…");
@@ -336,12 +375,12 @@
       const me=await cloudRequest("/auth/me");const changes=await cloudRequest(`/changes?since=${encodeURIComponent(cloudVersion)}`);
       console.table([{API:normalizedApiBase(cloudConfig.apiBaseUrl),Workspace:health.workspaceId,User:me.user?.username,Role:me.user?.role,Version:changes.version,Changed:changes.changed}]);
       setSyncStatus("connected","Sync · connected",`Server, authentication and shared storage are reachable. Version ${changes.version}.`);toast("Connection check passed");
-    }catch(err){cloudLastError=String(err?.message||err);setSyncStatus("error","Sync · check failed",cloudLastError);console.error("TeamFlow connection check failed",err);toast("Connection check failed — see Console");}
+    }catch(err){cloudLastError=String(err?.message||err);setSyncStatus("error","Sync · check failed",cloudLastError);tfLogError("Connection check failed",err,{apiBaseUrl:normalizedApiBase(cloudConfig.apiBaseUrl),workspaceId:cloudConfig.workspaceId||""});toast("Connection check failed — see Console");}
   }
   window.teamFlowSyncCheck=runCloudSyncCheck;window.teamFlowConnectionCheck=runCloudSyncCheck;
 
   async function cloudLogout(){
-    try{if(getCloudToken())await cloudRequest("/auth/logout",{method:"POST"});}catch(_){}
+    try{if(getCloudToken())await cloudRequest("/auth/logout",{method:"POST"});}catch(err){tfLogError("Logout request failed",err);}
     clearCloudToken();cloudUser=null;cloudReady=false;clearInterval(cloudPollTimer);state=emptySecureState();renderAfterSharedUpdate();showAuthGate("Signed out. Shared data was removed from this browser view.");setSyncStatus("connecting","Sync · sign in");
   }
   function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{}};}
@@ -357,14 +396,14 @@
 
   async function openCloudUsersModal(){
     if(cloudUser?.role!=="admin"){toast("Administrator access required");return;}
-    let users=[];try{users=(await cloudRequest("/admin/users")).users||[];}catch(err){toast(err.message);return;}
+    let users=[];try{users=(await cloudRequest("/admin/users")).users||[];}catch(err){tfLogError("Loading member access list failed",err);toast(err.message);return;}
     const root=document.getElementById("modalRoot");
     root.innerHTML=`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="TeamFlow member access"><div class="modal access-manager"><div class="modal-head"><div><h2>Team access</h2><div class="note">Create sign-in accounts, set roles and control who can access this TeamFlow workspace.</div></div><button id="closeCloudUsers" class="modal-close" type="button">×</button></div><div class="modal-body"><div class="access-manager-layout"><section class="access-create-panel"><div class="access-panel-title"><h3>Add or update member</h3></div><div class="form-grid"><div class="field"><label>Username</label><input id="cloudUserName" autocomplete="off" placeholder="e.g. john.smith" /></div><div class="field"><label>Display name</label><input id="cloudUserDisplay" autocomplete="off" placeholder="Full name" /></div><div class="field"><label>Role</label><select id="cloudUserRole"><option value="member">Member</option><option value="admin">Administrator</option></select></div><div class="field"><label>Password</label><input id="cloudUserPassword" type="password" autocomplete="new-password" placeholder="Min. 10 characters" /></div></div><div class="note" style="margin:9px 0 13px">For an existing account, leave Password blank to keep the current password.</div><button id="cloudSaveUser" class="btn primary" type="button">＋ Save member</button></section><section class="access-members-panel"><div class="access-panel-title"><h3>Members with access</h3><span class="note" id="cloudUsersCount"></span></div><div id="cloudUsersList" class="access-member-list"></div></section></div></div></div></div>`;
     const renderUsers=()=>{
       const box=document.getElementById("cloudUsersList"),count=document.getElementById("cloudUsersCount");if(!box)return;if(count)count.textContent=`${users.length} account${users.length===1?"":"s"}`;
       box.innerHTML=users.map(u=>`<div class="access-member-card" style="--member-color:${memberColor(u.displayName||u.username)}"><span class="access-member-avatar">${initials(u.displayName||u.username)}</span><div class="access-member-copy"><strong>${esc(u.displayName||u.username)}</strong><small>@${esc(u.username)}</small><span class="access-role-badge ${u.active?"":"disabled"}">${u.active?esc(u.role==="admin"?"Administrator":"Member"):"Disabled"}</span></div><div class="access-member-actions"><button class="btn small cloud-edit-user" data-user="${esc(u.username)}" type="button">Edit</button><button class="btn small cloud-toggle-user" data-user="${esc(u.username)}" data-active="${u.active?"1":"0"}" type="button">${u.active?"Disable":"Enable"}</button></div></div>`).join("")||'<div class="note">No accounts yet.</div>';
       box.querySelectorAll(".cloud-edit-user").forEach(btn=>btn.addEventListener("click",()=>{const u=users.find(x=>x.username===btn.dataset.user);if(!u)return;document.getElementById("cloudUserName").value=u.username||"";document.getElementById("cloudUserDisplay").value=u.displayName||"";document.getElementById("cloudUserRole").value=u.role||"member";document.getElementById("cloudUserPassword").value="";document.getElementById("cloudUserDisplay").focus();}));
-      box.querySelectorAll(".cloud-toggle-user").forEach(btn=>btn.addEventListener("click",async()=>{const u=users.find(x=>x.username===btn.dataset.user);if(!u)return;try{const data=await cloudRequest("/admin/users",{method:"POST",body:{username:u.username,displayName:u.displayName,role:u.role,active:btn.dataset.active!=="1"}});users=data.users||[];renderUsers();toast(u.active?"Member disabled":"Member enabled");}catch(err){toast(err.message);}}));
+      box.querySelectorAll(".cloud-toggle-user").forEach(btn=>btn.addEventListener("click",async()=>{const u=users.find(x=>x.username===btn.dataset.user);if(!u)return;try{const data=await cloudRequest("/admin/users",{method:"POST",body:{username:u.username,displayName:u.displayName,role:u.role,active:btn.dataset.active!=="1"}});users=data.users||[];renderUsers();toast(u.active?"Member disabled":"Member enabled");}catch(err){tfLogError("Updating member active state failed",err,{username:u.username});toast(err.message);}}));
     };
     renderUsers();
     document.getElementById("closeCloudUsers")?.addEventListener("click",()=>root.innerHTML="");root.querySelector(".modal-backdrop")?.addEventListener("click",e=>{if(e.target===e.currentTarget)root.innerHTML="";});
@@ -375,7 +414,7 @@
         const memberName=displayName||username;let member=state.members.find(m=>String(m.authUsername||"").toLowerCase()===username.toLowerCase())||state.members.find(m=>String(m.name||"").toLowerCase()===memberName.toLowerCase());
         if(!member){state.members.push({id:`auth-${username.toLowerCase()}`,name:memberName,role:role==="admin"?"Administrator":"Team member",color:colorForName(memberName),authUsername:username.toLowerCase()});saveState();renderTeam();renderMemberSelects();}else if(!member.authUsername){member.authUsername=username.toLowerCase();saveState();}
         document.getElementById("cloudUserName").value="";document.getElementById("cloudUserDisplay").value="";document.getElementById("cloudUserPassword").value="";document.getElementById("cloudUserRole").value="member";renderUsers();toast("Member access saved");
-      }catch(err){toast(err.message);}
+      }catch(err){tfLogError("Saving member access failed",err,{username});toast(err.message);}
     });
   }
 
@@ -407,7 +446,7 @@
     try{
       localStorage.setItem(STORAGE_KEY,JSON.stringify({theme:state.theme||"light",fontSizeByMember:state.fontSizeByMember||{},timelinePrefs:state.timelinePrefs||{}}));
       storageAvailable=true;
-    }catch(err){storageAvailable=false;localOk=false;}
+    }catch(err){storageAvailable=false;localOk=false;tfLogError("Saving local TeamFlow preferences failed",err);}
     scheduleRemoteSave();
     return localOk||cloudReady;
   }
@@ -732,6 +771,18 @@
 
   function csvImportKey({title="",description="",assignee="",area="",start="",end=""}={}){
     return [title,assignee,area,start,end,description].map(importIdentityPart).join("|");
+  }
+
+
+  // Stable FNV-1a hash used only for backward-compatible CSV import identities.
+  function spHash(value){
+    const text=String(value ?? "");
+    let hash=2166136261;
+    for(let i=0;i<text.length;i++){
+      hash^=text.charCodeAt(i);
+      hash=Math.imul(hash,16777619);
+    }
+    return (hash>>>0).toString(36);
   }
 
   function findExistingCsvTicket(explicitId,importKey){
@@ -2541,7 +2592,7 @@
       const b=getBackups()[Number(btn.dataset.restoreBackup)];if(!b)return;
       const ok=await confirmAction({title:"Restore this snapshot?",message:"Your current TeamFlow data will be replaced by the selected saved snapshot.",subject:new Date(b.ts).toLocaleString('en-GB'),confirmLabel:"Restore snapshot",icon:"↶",details:[b.label||"Snapshot","Current unsaved differences will be replaced."],warning:"Export the current board first if you may need it later."});
       if(!ok)return;
-      try{state=JSON.parse(b.data);if(!Array.isArray(state.releases))state.releases=[];state.tickets.forEach(t=>{if(!t.type)t.type='Task';if(!t.release)t.release=t.sprint||state.releases[0]||'';if(!t.risk)t.risk='None';if(!Array.isArray(t.dependencies))t.dependencies=[];});saveState();renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderReleaseEditor();renderBackups();toast('Snapshot restored');}catch(_){await noticeAction({title:'Snapshot could not be restored',message:'The saved snapshot is invalid or incomplete, so TeamFlow left your current workspace unchanged.',icon:'↶'});}
+      try{state=JSON.parse(b.data);if(!Array.isArray(state.releases))state.releases=[];state.tickets.forEach(t=>{if(!t.type)t.type='Task';if(!t.release)t.release=t.sprint||state.releases[0]||'';if(!t.risk)t.risk='None';if(!Array.isArray(t.dependencies))t.dependencies=[];});saveState();renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderReleaseEditor();renderBackups();toast('Snapshot restored');}catch(err){tfLogError('Snapshot restore failed',err);await noticeAction({title:'Snapshot could not be restored',message:'The saved snapshot is invalid or incomplete, so TeamFlow left your current workspace unchanged.',icon:'↶'});}
     }));
     renderSettingsSummary();
   }
@@ -3006,16 +3057,20 @@
 
   $("#importCsv").addEventListener("change",async e=>{$('#dataMenu')?.classList.add('hidden');
     const file=e.target.files[0];if(!file)return;
+    tfLog("info","CSV import started",{name:file.name,size:file.size,type:file.type||"unknown"});
     try{
       const buffer=await file.arrayBuffer();
-      let text;
+      let text;let encoding="utf-8";
       try{text=new TextDecoder("utf-8",{fatal:true}).decode(buffer);}
-      catch(_){text=new TextDecoder("windows-1252").decode(buffer);}
-      const rows=parseCsv(text);
+      catch(err){encoding="windows-1252";tfLog("warn","CSV UTF-8 decode failed; using Windows-1252 fallback",{name:file.name,message:err?.message||String(err)});text=new TextDecoder("windows-1252").decode(buffer);}
+      const delimiter=detectCsvDelimiter(text);
+      const rows=parseCsv(text,delimiter);
+      tfLog("info","CSV parsed",{name:file.name,encoding,delimiter:delimiter==="\t"?"TAB":delimiter,rowCount:rows.length});
       if(rows.length<2) throw new Error("CSV has no task rows");
       const headerRow=findCsvHeaderRow(rows);
       if(headerRow<0) throw new Error('Could not find the task header row. Expected a column such as "TASK", "Title" or "Summary".');
       const headers=rows[headerRow].map(normalizeHeader);
+      tfLog("info","CSV header detected",{headerRow:headerRow+1,headers});
       const col=(...names)=>{for(const n of names){const i=headers.indexOf(normalizeHeader(n));if(i>=0)return i;}return -1;};
       const idx={
         id:col("id","ticket id","key"),
@@ -3086,8 +3141,10 @@
       }
       normalizeWorkflowOrder();
       saveState();renderMemberSelects();renderTeam();renderStatusEditor();renderReleaseEditor();renderBackups();renderBoard();
-      logActivity('import',null,`CSV import: ${added} new ticket(s), ${existingRows} existing row(s) skipped`);saveState();openImportDiagnostics({added,existing:existingRows,newMembers,newStatuses,skipped,dateNormalized});
-    }catch(err){await noticeAction({title:"CSV import could not be completed",message:err.message||"The CSV format could not be read.",subject:"Check the header row and separators, then try again.",icon:"CSV"});}
+      logActivity('import',null,`CSV import: ${added} new ticket(s), ${existingRows} existing row(s) skipped`);saveState();
+      tfLog("info","CSV import completed",{file:file.name,added,existing:existingRows,newMembers,newStatuses,skipped,dateNormalized});
+      openImportDiagnostics({added,existing:existingRows,newMembers,newStatuses,skipped,dateNormalized});
+    }catch(err){tfLogError("CSV import failed",err,{file:file.name,size:file.size});await noticeAction({title:"CSV import could not be completed",message:err.message||"The CSV format could not be read.",subject:"Check the browser Console for the technical error details.",icon:"CSV"});}
     finally{e.target.value="";}
   });
 
@@ -3102,6 +3159,7 @@
 
   $("#importData").addEventListener("change",async e=>{$('#dataMenu')?.classList.add('hidden');
     const file=e.target.files[0];if(!file)return;
+    tfLog("info","JSON workspace import started",{name:file.name,size:file.size,type:file.type||"unknown"});
     try{
       const imported=JSON.parse(await file.text());
       if(!Array.isArray(imported.tickets)||!Array.isArray(imported.members)||!Array.isArray(imported.statuses)) throw new Error("Invalid format");
@@ -3109,9 +3167,12 @@
       if(!Array.isArray(state.releases)) state.releases=[];
       state.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.release)t.release=t.sprint||state.releases[0]||"";if(!t.risk)t.risk="None";if(!Array.isArray(t.dependencies))t.dependencies=[];});
       activeDocId=state.documents[0]?.id||null;ensureAdvancedState();
-      saveState();setTheme(state.theme);renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderBackups();renderDocuments();renderOverview();renderTimeline();toast("TeamFlow data imported");
+      saveState();setTheme(state.theme);renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderBackups();renderDocuments();renderOverview();renderTimeline();
+      tfLog("info","JSON workspace import completed",{file:file.name,tickets:state.tickets.length,members:state.members.length,statuses:state.statuses.length});
+      toast("TeamFlow data imported");
     }catch(err){
-      await noticeAction({title:"Invalid TeamFlow JSON",message:"This file does not contain a valid TeamFlow workspace export, so nothing was imported.",subject:"Choose a JSON file previously exported from TeamFlow.",icon:"{}"});
+      tfLogError("JSON workspace import failed",err,{file:file.name,size:file.size});
+      await noticeAction({title:"Invalid TeamFlow JSON",message:"This file does not contain a valid TeamFlow workspace export, so nothing was imported.",subject:"Check the browser Console for technical error details.",icon:"{}"});
     }finally{
       e.target.value="";
     }
@@ -3230,6 +3291,7 @@
   new MutationObserver(()=>syncCustomSelects()).observe(document.body,{childList:true,subtree:true});
 
 
+  tfLog("info","TeamFlow JavaScript initialized",{version:"diagnostics-1",location:window.location.href});
   normalizeWorkflowOrder();
   ensureAdvancedState();
   state.tickets.forEach(t=>{
