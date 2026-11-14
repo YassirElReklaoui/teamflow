@@ -292,7 +292,19 @@
     if(!next.timelinePrefs||typeof next.timelinePrefs!=="object")next.timelinePrefs={};
     if(!next.wipLimits||typeof next.wipLimits!=="object")next.wipLimits={};
     if(!next.statusIcons||typeof next.statusIcons!=="object")next.statusIcons={};
-    if(!Array.isArray(next.workflowOrder)||!next.workflowOrder.length)next.workflowOrder=Array.isArray(next.statuses)?next.statuses.slice():clone(DEFAULT_STATUSES);
+    // Reconcile the shared order during every remote load. workflowOrder is preferred when
+    // present; statuses is the compatibility copy. Both are normalized to the same sequence.
+    const remoteStatuses=next.statuses.slice();
+    const requestedOrder=Array.isArray(next.workflowOrder)&&next.workflowOrder.length?next.workflowOrder.slice():remoteStatuses.slice();
+    const reconciled=[];
+    const seenWorkflow=new Set();
+    requestedOrder.forEach(value=>{
+      const name=remoteStatuses.find(x=>String(x).toLowerCase()===String(value||"").trim().toLowerCase());
+      if(name&&!seenWorkflow.has(String(name).toLowerCase())){seenWorkflow.add(String(name).toLowerCase());reconciled.push(name);}
+    });
+    remoteStatuses.forEach(name=>{if(!seenWorkflow.has(String(name).toLowerCase())){seenWorkflow.add(String(name).toLowerCase());reconciled.push(name);}});
+    next.workflowOrder=reconciled.slice();
+    next.statuses=reconciled.slice();
     next.theme=next.theme||state.theme||"light";
     next.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.risk)t.risk="None";if(!t.blockerNote)t.blockerNote="";if(!Array.isArray(t.dependencies))t.dependencies=[];if(!Array.isArray(t.comments))t.comments=[];if(!Array.isArray(t.subtasks))t.subtasks=[];if(!Array.isArray(t.links))t.links=[];t.start=normalizeDate(t.start);t.end=normalizeDate(t.end);});
     return next;
@@ -323,6 +335,7 @@
       const data=await cloudRequest("/workspace");cloudApplyingRemote=true;state=normalizeCloudState(data.state);cloudApplyingRemote=false;
       cloudVersion=Number(data.version||0);cloudLastStamp=data.updatedAt||"";cloudLastError="";
       const identityChanged=syncCurrentMemberToAuthenticatedUser();
+      tfLog('info','Shared workflow order loaded',{version:cloudVersion,order:[...(state.workflowOrder||[])]});
       const globalSearch=document.getElementById("globalSearch");if(globalSearch)globalSearch.value="";
       activeDocId=state.documents.some(d=>d.id===activeDocId)?activeDocId:(state.documents[0]?.id||null);
       renderAfterSharedUpdate();
@@ -334,7 +347,12 @@
     }catch(err){cloudApplyingRemote=false;cloudLastError=String(err?.message||err);tfLogError("Loading shared workspace failed",err,{quiet,cloudVersion});setSyncStatus("error","Sync · error",cloudLastError);if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your TeamFlow session expired. Sign in again.");}else if(!quiet)toast("Sync unavailable");return null;}
   }
   function serializableCloudState(){
-    const copy=clone(state);copy.documents=(copy.documents||[]).filter(d=>d.kind!=="pdf-local").map(d=>{delete d.runtimeUrl;return d;});return copy;
+    ensureSharedWorkflowOrder();
+    const copy=clone(state);
+    copy.workflowOrder=(state.workflowOrder||[]).slice();
+    copy.statuses=(state.workflowOrder||state.statuses||[]).slice();
+    copy.documents=(copy.documents||[]).filter(d=>d.kind!=="pdf-local").map(d=>{delete d.runtimeUrl;return d;});
+    return copy;
   }
   async function saveRemoteWorkspace(){
     if(!cloudReady||cloudApplyingRemote)return false;
@@ -844,12 +862,31 @@
 
 
   function ensureSharedWorkflowOrder(){
-    const canonical=Array.isArray(state.statuses)&&state.statuses.length?state.statuses.slice():clone(DEFAULT_STATUSES);
-    let order=Array.isArray(state.workflowOrder)?state.workflowOrder.slice():canonical.slice();
-    order=order.filter((name,index)=>canonical.includes(name)&&order.indexOf(name)===index);
-    canonical.forEach(name=>{if(!order.includes(name))order.push(name);});
-    state.workflowOrder=order;
-    return order;
+    // The workflow NAME is the identity and the array order is the single shared board order.
+    // Keep workflowOrder and statuses in the same order for backward compatibility so an
+    // older code path cannot restore a different column sequence during synchronization.
+    const canonicalRaw=Array.isArray(state.statuses)&&state.statuses.length?state.statuses.slice():clone(DEFAULT_STATUSES);
+    const canonical=[];
+    const seenCanonical=new Set();
+    canonicalRaw.forEach(value=>{
+      const name=String(value||"").trim();
+      const key=name.toLowerCase();
+      if(name&&!seenCanonical.has(key)){seenCanonical.add(key);canonical.push(name);}
+    });
+    let order=Array.isArray(state.workflowOrder)&&state.workflowOrder.length?state.workflowOrder.slice():canonical.slice();
+    const seenOrder=new Set();
+    order=order.map(value=>String(value||"").trim()).filter(name=>{
+      const canonicalName=canonical.find(x=>x.toLowerCase()===name.toLowerCase());
+      if(!canonicalName)return false;
+      const key=canonicalName.toLowerCase();
+      if(seenOrder.has(key))return false;
+      seenOrder.add(key);
+      return true;
+    }).map(name=>canonical.find(x=>x.toLowerCase()===name.toLowerCase()));
+    canonical.forEach(name=>{if(!seenOrder.has(name.toLowerCase())){seenOrder.add(name.toLowerCase());order.push(name);}});
+    state.workflowOrder=order.slice();
+    state.statuses=order.slice();
+    return order.slice();
   }
 
   function moveSharedWorkflow(statusName,direction){
@@ -860,7 +897,8 @@
     const nextIndex=direction==='up'?index-1:direction==='down'?index+1:index;
     if(nextIndex<0||nextIndex>=order.length||nextIndex===index)return false;
     [order[index],order[nextIndex]]=[order[nextIndex],order[index]];
-    state.workflowOrder=order;
+    state.workflowOrder=order.slice();
+    state.statuses=order.slice();
     saveState();
     tfLog('info','Shared workflow order changed',{admin:cloudUser?.username||'',status:statusName,direction,order:[...order]});
     return true;
@@ -3036,7 +3074,8 @@
       const existingPos=sharedOrder.indexOf(clean);if(existingPos>=0)sharedOrder.splice(existingPos,1);
       if(after==="__end__")sharedOrder.push(clean);
       else{const sharedAfter=sharedOrder.indexOf(after);sharedOrder.splice(sharedAfter>=0?sharedAfter+1:sharedOrder.length,0,clean);}
-      state.workflowOrder=sharedOrder;
+      state.workflowOrder=sharedOrder.slice();
+      state.statuses=sharedOrder.slice();
       if(!state.statusIcons||typeof state.statusIcons!=="object") state.statusIcons={};
       state.statusIcons[clean]=selectedIcon;
       normalizeWorkflowOrder();
