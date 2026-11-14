@@ -92,7 +92,7 @@
     return {
       tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],documents:[],activity:[],favorites:[],recentTickets:[],
       theme:prefs.theme||"light",currentMember:"",savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},
-      fontSizeByMember:prefs.fontSizeByMember&&typeof prefs.fontSizeByMember==="object"?prefs.fontSizeByMember:{},statusIcons:{},timelinePrefs:prefs.timelinePrefs&&typeof prefs.timelinePrefs==="object"?prefs.timelinePrefs:{}
+      fontSizeByMember:prefs.fontSizeByMember&&typeof prefs.fontSizeByMember==="object"?prefs.fontSizeByMember:{},statusIcons:{},timelinePrefs:prefs.timelinePrefs&&typeof prefs.timelinePrefs==="object"?prefs.timelinePrefs:{},boardWorkflowOrderByMember:{}
     };
   }
 
@@ -292,6 +292,7 @@
     if(!next.timelinePrefs||typeof next.timelinePrefs!=="object")next.timelinePrefs={};
     if(!next.wipLimits||typeof next.wipLimits!=="object")next.wipLimits={};
     if(!next.statusIcons||typeof next.statusIcons!=="object")next.statusIcons={};
+    if(!next.boardWorkflowOrderByMember||typeof next.boardWorkflowOrderByMember!=="object"||Array.isArray(next.boardWorkflowOrderByMember))next.boardWorkflowOrderByMember={};
     next.theme=next.theme||state.theme||"light";
     next.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.risk)t.risk="None";if(!t.blockerNote)t.blockerNote="";if(!Array.isArray(t.dependencies))t.dependencies=[];if(!Array.isArray(t.comments))t.comments=[];if(!Array.isArray(t.subtasks))t.subtasks=[];if(!Array.isArray(t.links))t.links=[];t.start=normalizeDate(t.start);t.end=normalizeDate(t.end);});
     return next;
@@ -383,7 +384,7 @@
     try{if(getCloudToken())await cloudRequest("/auth/logout",{method:"POST"});}catch(err){tfLogError("Logout request failed",err);}
     clearCloudToken();cloudUser=null;cloudReady=false;clearInterval(cloudPollTimer);state=emptySecureState();renderAfterSharedUpdate();showAuthGate("Signed out. Shared data was removed from this browser view.");setSyncStatus("connecting","Sync · sign in");
   }
-  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{}};}
+  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},boardWorkflowOrderByMember:{}};}
 
   function updateCloudSettingsCard(){
     const apiEl=document.getElementById("cloudSettingsApi"),wsEl=document.getElementById("cloudSettingsWorkspace"),userEl=document.getElementById("cloudSettingsUser"),stateEl=document.getElementById("cloudSettingsState"),manage=document.getElementById("cloudManageUsers");
@@ -727,14 +728,15 @@
   }
 
   function normalizeWorkflowOrder(){
-    if(!Array.isArray(state.statuses)) return;
-    const doneIndex=state.statuses.findIndex(s=>s.toLowerCase()==="done");
-    const deployedIndex=state.statuses.findIndex(s=>s.toLowerCase()==="deployed on sit");
-    if(doneIndex>=0 && deployedIndex>=0 && deployedIndex<doneIndex){
-      const [deployed]=state.statuses.splice(deployedIndex,1);
-      const newDoneIndex=state.statuses.findIndex(s=>s.toLowerCase()==="done");
-      state.statuses.splice(newDoneIndex+1,0,deployed);
-    }
+    // Shared workflow identities are kept stable. This function never reorders them.
+    if(!Array.isArray(state.statuses)||!state.statuses.length){state.statuses=clone(DEFAULT_STATUSES);return;}
+    const seen=new Set();
+    state.statuses=state.statuses.map(x=>String(x||"").trim()).filter(name=>{
+      if(!name)return false;
+      const key=name.toLowerCase();
+      if(seen.has(key))return false;
+      seen.add(key);return true;
+    });
   }
 
   function splitList(value){
@@ -820,6 +822,37 @@
   }
 
 
+  function boardWorkflowOrderKey(memberName=state.currentMember){
+    const username=String(cloudUser?.username||"").trim().toLowerCase();
+    if(username)return `auth:${username}`;
+    const member=state.members.find(m=>m.name===memberName)||state.members[0];
+    return member?.id||`member:${String(memberName||"default").trim().toLowerCase()}`;
+  }
+
+  function ensureBoardWorkflowOrder(memberName=state.currentMember){
+    if(!state.boardWorkflowOrderByMember||typeof state.boardWorkflowOrderByMember!=="object"||Array.isArray(state.boardWorkflowOrderByMember))state.boardWorkflowOrderByMember={};
+    const key=boardWorkflowOrderKey(memberName);
+    const canonical=Array.isArray(state.statuses)?state.statuses.slice():clone(DEFAULT_STATUSES);
+    let order=Array.isArray(state.boardWorkflowOrderByMember[key])?state.boardWorkflowOrderByMember[key].slice():canonical.slice();
+    order=order.filter((name,index)=>canonical.includes(name)&&order.indexOf(name)===index);
+    canonical.forEach(name=>{if(!order.includes(name))order.push(name);});
+    state.boardWorkflowOrderByMember[key]=order;
+    return order;
+  }
+
+  function moveBoardWorkflow(statusName,direction){
+    const order=ensureBoardWorkflowOrder();
+    const index=order.indexOf(statusName);
+    if(index<0)return false;
+    const nextIndex=direction==='up'?index-1:direction==='down'?index+1:index;
+    if(nextIndex<0||nextIndex>=order.length||nextIndex===index)return false;
+    [order[index],order[nextIndex]]=[order[nextIndex],order[index]];
+    state.boardWorkflowOrderByMember[boardWorkflowOrderKey()]=order;
+    saveState();
+    tfLog('info','Personal board workflow order changed',{user:boardWorkflowOrderKey(),status:statusName,direction,order:[...order]});
+    return true;
+  }
+
   function ensureAdvancedState(){
     if(!Array.isArray(state.activity)) state.activity=[];
     if(!Array.isArray(state.favorites)) state.favorites=[];
@@ -828,6 +861,7 @@
     if(!state.wipLimits || typeof state.wipLimits!=="object" || Array.isArray(state.wipLimits)) state.wipLimits={};
     if(!state.fontSizeByMember || typeof state.fontSizeByMember!=="object" || Array.isArray(state.fontSizeByMember)) state.fontSizeByMember={};
     if(!state.statusIcons || typeof state.statusIcons!=="object" || Array.isArray(state.statusIcons)) state.statusIcons={};
+    if(!state.boardWorkflowOrderByMember || typeof state.boardWorkflowOrderByMember!=="object" || Array.isArray(state.boardWorkflowOrderByMember)) state.boardWorkflowOrderByMember={};
     if(!state.timelinePrefs || typeof state.timelinePrefs!=="object" || Array.isArray(state.timelinePrefs)) state.timelinePrefs={};
     const tp=state.timelinePrefs;
     if(!["gantt","list"].includes(tp.mode)) tp.mode="gantt";
@@ -838,6 +872,8 @@
     if(!tp.filters || typeof tp.filters!=="object" || Array.isArray(tp.filters)) tp.filters={};
     ["assignee","status","release","type"].forEach(k=>{if(typeof tp.filters[k]!=="string") tp.filters[k]="";});
     if(!tp.collapsed || typeof tp.collapsed!=="object" || Array.isArray(tp.collapsed)) tp.collapsed={};
+    Object.keys(state.boardWorkflowOrderByMember).forEach(key=>{const order=Array.isArray(state.boardWorkflowOrderByMember[key])?state.boardWorkflowOrderByMember[key]:[];state.boardWorkflowOrderByMember[key]=order.filter((name,index)=>state.statuses.includes(name)&&order.indexOf(name)===index);state.statuses.forEach(name=>{if(!state.boardWorkflowOrderByMember[key].includes(name))state.boardWorkflowOrderByMember[key].push(name);});});
+    ensureBoardWorkflowOrder();
     state.statuses.forEach(status=>{if(!state.statusIcons[status]) state.statusIcons[status]=DEFAULT_STATUS_ICONS[status]||"circle";});
     Object.keys(state.statusIcons).forEach(status=>{if(!state.statuses.includes(status)) delete state.statusIcons[status];});
     state.tickets.forEach(t=>{
@@ -1464,7 +1500,8 @@
     }
 
     function buildColumns(list,container){
-      state.statuses.forEach(statusName=>{
+      const boardOrder=ensureBoardWorkflowOrder();
+      boardOrder.forEach(statusName=>{
         const tickets=list.filter(t=>t.status===statusName);const limit=wipLimitFor(statusName);const exceeded=limit&&tickets.length>limit;const col=document.createElement('section');col.className='column'+(exceeded?' wip-exceeded':'');col.dataset.status=statusName;col.innerHTML=`<div class="column-head">${workflowIcon(statusName)}<strong>${esc(statusName)}</strong><span class="count">${tickets.length}${limit?` / ${limit}`:''}</span>${exceeded?'<span class="wip-warning">WIP exceeded</span>':''}<button class="add" type="button" aria-label="Add ticket">＋</button></div><div class="cards"></div>`;$('.add',col).onclick=()=>openTicketModal(null,statusName);const cards=$('.cards',col);tickets.forEach(t=>cards.appendChild(makeTicket(t)));if(!tickets.length)cards.innerHTML='<div class="empty">No matching tickets</div>';
         if(!bulkMode){col.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';col.classList.add('drag-over');});col.addEventListener('dragleave',e=>{if(!col.contains(e.relatedTarget))col.classList.remove('drag-over');});col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('drag-over');const id=e.dataTransfer.getData('text/plain');const ticket=state.tickets.find(t=>t.id===id);if(ticket&&ticket.status!==statusName){const old=ticket.status;ticket.status=statusName;ticket.history=ticket.history||[];ticket.history.unshift(`Status changed to ${statusName}`);logActivity('move',ticket,`Moved ${old} → ${statusName}`);saveState();refreshDataViews();toast(`${id} moved to ${statusName}`);}});}
         container.appendChild(col);
@@ -1514,15 +1551,24 @@
   }
 
   function renderStatusEditor(){
-    $("#statusEditor").innerHTML = state.statuses.map((statusName,i)=>{
+    const order=ensureBoardWorkflowOrder();
+    $("#statusEditor").innerHTML = order.map((statusName,i)=>{
       const count=state.tickets.filter(t=>t.status===statusName).length;
+      const sharedIndex=state.statuses.indexOf(statusName);
       return `
       <div class="status-setting-row">
-        <div class="status-setting-main"><span class="settings-workflow-icon">${workflowIconSvg(workflowIconKey(statusName))}</span><div><strong>${esc(statusName)}</strong><small>${count} ticket${count===1?"":"s"} · ${esc(WORKFLOW_ICON_LIBRARY[workflowIconKey(statusName)]?.label||"General")}</small></div></div>
-        <button class="btn small status-remove-btn" type="button" data-remove-status="${i}" ${state.statuses.length<=1?"disabled":""}>Remove</button>
+        <div class="status-setting-main"><span class="settings-workflow-icon">${workflowIconSvg(workflowIconKey(statusName))}</span><div><strong>${esc(statusName)}</strong><small>${count} ticket${count===1?"":"s"} · ${esc(WORKFLOW_ICON_LIBRARY[workflowIconKey(statusName)]?.label||"General")} · Personal board position ${i+1}</small></div></div>
+        <div class="work-order-actions">
+          <button class="btn small" type="button" data-board-status-move="up" data-board-status="${esc(statusName)}" ${i===0?"disabled":""} title="Move left on my Board">←</button>
+          <button class="btn small" type="button" data-board-status-move="down" data-board-status="${esc(statusName)}" ${i===order.length-1?"disabled":""} title="Move right on my Board">→</button>
+          <button class="btn small status-remove-btn" type="button" data-remove-status="${sharedIndex}" ${state.statuses.length<=1?"disabled":""}>Remove</button>
+        </div>
       </div>`;
     }).join("");
 
+    $$('[data-board-status-move]').forEach(btn=>btn.addEventListener('click',()=>{
+      if(moveBoardWorkflow(btn.dataset.boardStatus,btn.dataset.boardStatusMove)){renderStatusEditor();renderBoard();toast(`${btn.dataset.boardStatus} moved on your Board`);}
+    }));
     $$('[data-remove-status]').forEach(btn=>{
       btn.addEventListener("click",()=>openRemoveWorkflowModal(Number(btn.dataset.removeStatus)));
     });
@@ -1572,6 +1618,7 @@
         ticket.history.unshift(`Workflow "${workflow}" removed; moved to ${destination}`);
       });
       state.statuses.splice(index,1);
+      if(state.boardWorkflowOrderByMember&&typeof state.boardWorkflowOrderByMember==='object'){Object.keys(state.boardWorkflowOrderByMember).forEach(key=>{state.boardWorkflowOrderByMember[key]=(state.boardWorkflowOrderByMember[key]||[]).filter(name=>name!==workflow);});}
       if(state.statusIcons) delete state.statusIcons[workflow];
       ensureMyWorkPrefs();
       saveState();
@@ -2942,6 +2989,11 @@
         const index=state.statuses.indexOf(after);
         state.statuses.splice(index>=0?index+1:state.statuses.length,0,clean);
       }
+      const personalOrder=ensureBoardWorkflowOrder();
+      personalOrder.splice(personalOrder.indexOf(clean),1);
+      if(after==="__end__")personalOrder.push(clean);
+      else{const personalAfter=personalOrder.indexOf(after);personalOrder.splice(personalAfter>=0?personalAfter+1:personalOrder.length,0,clean);}
+      state.boardWorkflowOrderByMember[boardWorkflowOrderKey()]=personalOrder;
       if(!state.statusIcons||typeof state.statusIcons!=="object") state.statusIcons={};
       state.statusIcons[clean]=selectedIcon;
       normalizeWorkflowOrder();
@@ -3165,6 +3217,7 @@
       if(!Array.isArray(imported.tickets)||!Array.isArray(imported.members)||!Array.isArray(imported.statuses)) throw new Error("Invalid format");
       state={...state,...imported,documents:Array.isArray(imported.documents)?imported.documents:[]};
       if(!Array.isArray(state.releases)) state.releases=[];
+      if(!state.boardWorkflowOrderByMember||typeof state.boardWorkflowOrderByMember!=="object"||Array.isArray(state.boardWorkflowOrderByMember))state.boardWorkflowOrderByMember={};
       state.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.release)t.release=t.sprint||state.releases[0]||"";if(!t.risk)t.risk="None";if(!Array.isArray(t.dependencies))t.dependencies=[];});
       activeDocId=state.documents[0]?.id||null;ensureAdvancedState();
       saveState();setTheme(state.theme);renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderBackups();renderDocuments();renderOverview();renderTimeline();
@@ -3217,7 +3270,7 @@
     if(!ok)return;
     state={
       tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state.theme,currentMember:"",documents:[],
-      activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},wipLimits:{},fontSizeByMember:{},statusIcons:{},timelinePrefs:{}
+      activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},wipLimits:{},fontSizeByMember:{},statusIcons:{},timelinePrefs:{},boardWorkflowOrderByMember:{}
     };
     activeDocId=null;
     try{localStorage.removeItem(BACKUP_KEY);}catch(_){}
