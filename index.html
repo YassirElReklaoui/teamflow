@@ -1627,6 +1627,89 @@
     @media(max-width:900px){.topbar-sync .label{display:none}.connected-user-copy{display:none}.settings-grid{grid-template-areas:"workflow" "appearance" "access" "wip" "release" "backup" "local"!important}.cloud-settings-lines{grid-template-columns:1fr 1fr!important}.access-manager-layout{grid-template-columns:1fr}.access-member-list{max-height:300px}}
     @media(max-width:620px){.cloud-settings-lines{grid-template-columns:1fr!important}.access-create-panel .form-grid{grid-template-columns:1fr}.access-member-card{grid-template-columns:auto minmax(0,1fr)}.access-member-actions{grid-column:1/-1;justify-content:flex-end}}
 
+
+
+    /* 2026-11 Manage members modal refinement */
+    .access-manager{
+      width:min(980px,calc(100vw - 36px))!important;
+      max-width:980px!important;
+      max-height:calc(100vh - 40px);
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+      border-radius:22px!important;
+      background:var(--panel)!important;
+      border:1px solid color-mix(in srgb,var(--accent) 14%,var(--border))!important;
+      box-shadow:0 30px 90px rgba(15,23,42,.28)!important;
+    }
+    .access-manager>.modal-head{
+      flex:0 0 auto;
+      min-height:76px;
+      padding:16px 20px!important;
+      align-items:center;
+      background:linear-gradient(135deg,color-mix(in srgb,var(--accent-soft) 60%,var(--panel)),var(--panel) 64%)!important;
+      border-bottom:1px solid var(--border)!important;
+    }
+    .access-manager>.modal-head>div:first-child{min-width:0;flex:1}
+    .access-manager>.modal-head h2{font-size:calc(20px + var(--app-font-delta,0px))!important;letter-spacing:-.025em}
+    .access-manager>.modal-head .note{margin-top:4px;max-width:680px;font-size:calc(12px + var(--app-font-delta,0px))!important}
+    .access-manager>.modal-head .modal-close{flex:0 0 36px;width:36px;height:36px;border-radius:11px}
+    .access-manager>.modal-body{flex:1;min-height:0;overflow:auto;padding:18px!important;background:color-mix(in srgb,var(--panel-2) 48%,var(--panel))}
+    .access-manager-layout{grid-template-columns:minmax(320px,.86fr) minmax(0,1.14fr)!important;gap:16px!important;align-items:stretch!important}
+    .access-create-panel,.access-members-panel{
+      padding:16px!important;
+      border-radius:16px!important;
+      border:1px solid var(--border)!important;
+      background:var(--panel)!important;
+      box-shadow:0 5px 16px rgba(31,39,70,.04);
+      min-width:0;
+    }
+    .access-create-panel{display:flex;flex-direction:column}
+    .access-panel-title{min-height:32px;margin-bottom:14px!important}
+    .access-panel-title h3{font-size:calc(15px + var(--app-font-delta,0px))!important;letter-spacing:-.015em}
+    #cloudUsersCount{padding:5px 9px;border-radius:999px;background:var(--panel-3);color:var(--muted);font-weight:850;white-space:nowrap}
+    .access-create-panel .form-grid{grid-template-columns:1fr 1fr!important;gap:12px!important}
+    .access-create-panel .field{gap:6px}
+    .access-create-panel .field label{font-size:calc(12px + var(--app-font-delta,0px))!important;letter-spacing:.045em;color:var(--muted)}
+    .access-create-panel .field input,.access-create-panel .field select,.access-create-panel .tf-select-button{min-height:42px;border-radius:10px!important;background:var(--panel)!important}
+    .access-create-panel .note{line-height:1.45;margin:11px 0 14px!important}
+    #cloudSaveUser{align-self:flex-start;min-width:145px;min-height:42px;border-radius:11px}
+    .access-member-list{gap:10px!important;max-height:420px!important;padding-right:3px!important}
+    .access-member-card{
+      grid-template-columns:auto minmax(0,1fr) auto!important;
+      gap:12px!important;
+      min-height:82px;
+      padding:12px!important;
+      border-radius:14px!important;
+      background:linear-gradient(135deg,var(--panel),color-mix(in srgb,var(--accent-soft) 18%,var(--panel)))!important;
+      transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease;
+    }
+    .access-member-card:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--accent) 25%,var(--border));box-shadow:0 7px 18px rgba(31,39,70,.07)}
+    .access-member-avatar{width:44px!important;height:44px!important;flex:0 0 44px;box-shadow:0 7px 16px color-mix(in srgb,var(--member-color,var(--accent)) 24%,transparent)}
+    .access-member-copy strong{font-size:calc(13px + var(--app-font-delta,0px))!important}
+    .access-member-copy small{font-size:calc(12px + var(--app-font-delta,0px))!important}
+    .access-role-badge{margin-top:7px!important;padding:4px 8px!important;font-size:calc(11px + var(--app-font-delta,0px))!important}
+    .access-member-actions{align-items:center;gap:7px!important}
+    .access-member-actions .btn{min-height:36px!important;padding:7px 10px!important;border-radius:9px!important;font-size:calc(12px + var(--app-font-delta,0px))!important;box-shadow:none}
+    .access-member-actions .cloud-toggle-user{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 20%,var(--border));background:color-mix(in srgb,var(--danger) 4%,var(--panel))}
+    html[data-theme="dark"] .access-manager>.modal-body{background:color-mix(in srgb,var(--bg) 42%,var(--panel))}
+    html[data-theme="dark"] .access-member-card{background:linear-gradient(135deg,var(--panel),color-mix(in srgb,var(--accent-soft) 30%,var(--panel)))!important}
+    html[data-theme="dark"] .access-member-actions .cloud-toggle-user{background:#2d1a1c;border-color:#5a2a2e;color:#ffb4ad}
+    @media(max-width:820px){
+      .access-manager{width:min(100%,calc(100vw - 14px))!important;max-height:calc(100vh - 14px);border-radius:16px!important}
+      .access-manager-layout{grid-template-columns:1fr!important}
+      .access-member-list{max-height:320px!important}
+    }
+    @media(max-width:560px){
+      .access-manager>.modal-head{padding:13px 14px!important;min-height:68px}
+      .access-manager>.modal-body{padding:10px!important}
+      .access-create-panel,.access-members-panel{padding:12px!important}
+      .access-create-panel .form-grid{grid-template-columns:1fr!important}
+      .access-member-card{grid-template-columns:auto minmax(0,1fr)!important}
+      .access-member-actions{grid-column:1/-1!important;justify-content:flex-end!important;padding-top:4px}
+      #cloudSaveUser{width:100%}
+    }
+
 </style>
 </head>
 <body>
@@ -2387,7 +2470,7 @@
     if(cloudUser?.role!=="admin"){toast("Administrator access required");return;}
     let users=[];try{users=(await cloudRequest("/admin/users")).users||[];}catch(err){toast(err.message);return;}
     const root=document.getElementById("modalRoot");
-    root.innerHTML=`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="TeamFlow member access"><div class="modal-card access-manager"><div class="modal-head"><div><h2>Team access</h2><div class="note">Create sign-in accounts, set roles and control who can access this TeamFlow workspace.</div></div><button id="closeCloudUsers" class="modal-close" type="button">×</button></div><div class="modal-body"><div class="access-manager-layout"><section class="access-create-panel"><div class="access-panel-title"><h3>Add or update member</h3></div><div class="form-grid"><div class="field"><label>Username</label><input id="cloudUserName" autocomplete="off" placeholder="e.g. john.smith" /></div><div class="field"><label>Display name</label><input id="cloudUserDisplay" autocomplete="off" placeholder="Full name" /></div><div class="field"><label>Role</label><select id="cloudUserRole"><option value="member">Member</option><option value="admin">Administrator</option></select></div><div class="field"><label>Password</label><input id="cloudUserPassword" type="password" autocomplete="new-password" placeholder="Min. 10 characters" /></div></div><div class="note" style="margin:9px 0 13px">For an existing account, leave Password blank to keep the current password.</div><button id="cloudSaveUser" class="btn primary" type="button">＋ Save member</button></section><section class="access-members-panel"><div class="access-panel-title"><h3>Members with access</h3><span class="note" id="cloudUsersCount"></span></div><div id="cloudUsersList" class="access-member-list"></div></section></div></div></div></div>`;
+    root.innerHTML=`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="TeamFlow member access"><div class="modal access-manager"><div class="modal-head"><div><h2>Team access</h2><div class="note">Create sign-in accounts, set roles and control who can access this TeamFlow workspace.</div></div><button id="closeCloudUsers" class="modal-close" type="button">×</button></div><div class="modal-body"><div class="access-manager-layout"><section class="access-create-panel"><div class="access-panel-title"><h3>Add or update member</h3></div><div class="form-grid"><div class="field"><label>Username</label><input id="cloudUserName" autocomplete="off" placeholder="e.g. john.smith" /></div><div class="field"><label>Display name</label><input id="cloudUserDisplay" autocomplete="off" placeholder="Full name" /></div><div class="field"><label>Role</label><select id="cloudUserRole"><option value="member">Member</option><option value="admin">Administrator</option></select></div><div class="field"><label>Password</label><input id="cloudUserPassword" type="password" autocomplete="new-password" placeholder="Min. 10 characters" /></div></div><div class="note" style="margin:9px 0 13px">For an existing account, leave Password blank to keep the current password.</div><button id="cloudSaveUser" class="btn primary" type="button">＋ Save member</button></section><section class="access-members-panel"><div class="access-panel-title"><h3>Members with access</h3><span class="note" id="cloudUsersCount"></span></div><div id="cloudUsersList" class="access-member-list"></div></section></div></div></div></div>`;
     const renderUsers=()=>{
       const box=document.getElementById("cloudUsersList"),count=document.getElementById("cloudUsersCount");if(!box)return;if(count)count.textContent=`${users.length} account${users.length===1?"":"s"}`;
       box.innerHTML=users.map(u=>`<div class="access-member-card" style="--member-color:${memberColor(u.displayName||u.username)}"><span class="access-member-avatar">${initials(u.displayName||u.username)}</span><div class="access-member-copy"><strong>${esc(u.displayName||u.username)}</strong><small>@${esc(u.username)}</small><span class="access-role-badge ${u.active?"":"disabled"}">${u.active?esc(u.role==="admin"?"Administrator":"Member"):"Disabled"}</span></div><div class="access-member-actions"><button class="btn small cloud-edit-user" data-user="${esc(u.username)}" type="button">Edit</button><button class="btn small cloud-toggle-user" data-user="${esc(u.username)}" data-active="${u.active?"1":"0"}" type="button">${u.active?"Disable":"Enable"}</button></div></div>`).join("")||'<div class="note">No accounts yet.</div>';
