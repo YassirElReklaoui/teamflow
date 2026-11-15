@@ -482,7 +482,7 @@
       const loaded=await loadRemoteWorkspace({quiet:true});if(!loaded)throw new Error(cloudLastError||"Could not load workspace");
       if(cloudUser?.role==="admin")await loadBackups({quiet:true});
       setSyncStatus("connected","Sync · connected",`Signed in as ${cloudUser.displayName||cloudUser.username}`);
-      clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,Number(cloudConfig.pollMs||10000));
+      clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,Number(cloudConfig.pollMs||300000));
       updateCloudSettingsCard();
       window.teamFlowNotificationsOnConnected?.();
     }catch(err){
