@@ -28,7 +28,7 @@
 
   // Supabase is used only as a realtime wake-up channel. Google Sheets remains
   // the authoritative TeamFlow datastore behind the Cloudflare Worker.
-  const TEAMFLOW_SUPABASE_URL="https://wmmfdrylltzofsebfoca.supabase.co";
+  const TEAMFLOW_SUPABASE_URL="https://wmmfdrytltzofsebfoca.supabase.co";
   const TEAMFLOW_SUPABASE_PUBLISHABLE_KEY="sb_publishable_-Yja73LytizjYuTkh4ShfA_MZcpNJjf";
   const TEAMFLOW_REALTIME_EVENT="workspace.changed";
   let teamflowRealtimeClient=null;
