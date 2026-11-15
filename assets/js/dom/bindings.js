@@ -366,16 +366,23 @@
     state.releases.push(name);state.releaseMeta=state.releaseMeta||{};state.releaseMeta[name]={visibility:"active"};$("#newReleaseName").value="";saveState();renderReleaseEditor();renderMemberSelects();toast(`Release "${name}" added`);
   });
 
-  $("#resetData").addEventListener("click",async()=>{
-    const ok=await confirmAction({title:"Clear the TeamFlow workspace?",message:"This clears the shared TeamFlow data for everyone. Personal browser preferences such as theme and font size are kept.",subject:"Shared TeamFlow workspace",confirmLabel:"Clear workspace",icon:"↺",details:[`${state.tickets.length} ticket${state.tickets.length===1?"":"s"} will be removed.`,`${state.members.length} team member${state.members.length===1?"":"s"} will be removed.`,"Default workflow columns will remain available for the next CSV import."],warning:"Export JSON or CSV first if you want to keep a copy. This shared change will sync to other signed-in users."});
+  $("#resetData")?.addEventListener("click",async()=>{
+    if(cloudUser?.role!=="admin"){toast("Administrator access required");return;}
+    const ok=await confirmAction({title:"Clear the TeamFlow workspace?",message:"This removes shared project data for everyone while keeping sign-in accounts and server backups available.",subject:"Shared TeamFlow workspace",confirmLabel:"Clear workspace",icon:"↺",details:[`${state.tickets.length} ticket${state.tickets.length===1?"":"s"} will be removed.`,`${state.members.length} team member${state.members.length===1?"":"s"} will be removed.`,`Workflows reset to the default stages. Existing server backups remain available.`],warning:"This cannot be undone unless you restore a backup."});
     if(!ok)return;
-    state={
-      tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state.theme,currentMember:"",documents:[],
-      activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},wipLimits:{},fontSizeByMember:{},statusIcons:{},timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES)},workflowOrder:clone(DEFAULT_STATUSES)
-    };
-    activeDocId=null;
-    try{localStorage.removeItem(BACKUP_KEY);}catch(_){}
-    ensureAdvancedState();saveState();renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderBackups();renderDocuments();renderOverview();renderTimeline();toast("Workspace cleared");
+    const btn=$("#resetData");if(btn){btn.disabled=true;btn.textContent="Clearing…";}
+    try{
+      setSyncStatus("saving","Workspace · clearing…");
+      await clearSharedWorkspace();
+      activeDocId=null;
+      renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderBackups();renderDocuments();renderOverview();renderTimeline();
+      setSyncStatus("connected","Sync · connected");
+      toast("Shared workspace cleared");
+    }catch(err){
+      tfLogError("Clearing shared workspace failed",err);
+      setSyncStatus("error","Clear · failed",err.message);
+      toast(err.message||"Could not clear workspace");
+    }finally{if(btn){btn.disabled=false;btn.textContent="Clear shared workspace";}}
   });
 
 

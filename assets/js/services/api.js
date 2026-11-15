@@ -520,6 +520,7 @@
     if(manage)manage.style.display=isAdmin?"inline-flex":"none";
     [document.getElementById("addStatus"),document.getElementById("addWorkflowStep"),document.getElementById("settingsBackupShortcut"),document.getElementById("createBackupNow")].forEach(el=>{if(el)el.style.display=isAdmin?"inline-flex":"none";});
     const settingsView=document.getElementById("settingsView");if(settingsView)settingsView.classList.toggle("is-non-admin",!isAdmin);
+    const localDataCard=document.querySelector("#settingsView .local-settings");if(localDataCard)localDataCard.style.display=isAdmin?"":"none";
     const nameInput=document.getElementById("newStatusName");if(nameInput)nameInput.disabled=!isAdmin;
   }
 
@@ -600,6 +601,13 @@
     const result=await cloudRequest(`/admin/backups/${encodeURIComponent(id)}/restore`,{method:'POST'});
     cloudVersion=Number(result.version||cloudVersion);cloudLastStamp=result.updatedAt||new Date().toISOString();
     await loadRemoteWorkspace({quiet:true});await loadBackups({quiet:true});renderBackups();renderSettingsSummary();return result;
+  }
+  async function clearSharedWorkspace(){
+    if(cloudUser?.role!=="admin")throw Object.assign(new Error("Administrator access required"),{status:403});
+    const result=await cloudRequest('/admin/workspace',{method:'DELETE'});
+    cloudVersion=Number(result.version||cloudVersion);cloudLastStamp=result.updatedAt||new Date().toISOString();
+    await loadRemoteWorkspace({quiet:true});
+    return result;
   }
   function rememberPreviousState(){/* Shared data is intentionally not persisted in browser storage. */}
   function saveState(){

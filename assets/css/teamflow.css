@@ -2363,3 +2363,20 @@ html,body,*{
 #settingsView.is-non-admin #addStatus,
 #settingsView.is-non-admin .workflow-remove-action,
 #settingsView.is-non-admin .workflow-drag-handle{display:none!important}
+
+/* TeamFlow settings icon / admin cleanup */
+.settings-hero-icon{width:46px;height:46px;border-radius:14px;background:linear-gradient(145deg,#6f4bf6,#4f2ee8);box-shadow:0 10px 24px rgba(99,72,246,.24);display:grid;place-items:center;color:#fff}
+.settings-hero-icon svg{width:25px;height:25px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.settings-section-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:0 0 auto}
+.settings-section-icon svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.settings-section-icon.purple{background:#f0eaff;color:#6d45f7}
+.settings-section-icon.blue{background:#eaf5ff;color:#2f92ef}
+.settings-section-icon.amber{background:#fff1d7;color:#e89a18}
+.settings-section-icon.green{background:#dcf8e9;color:#13a866}
+.settings-section-icon.teal{background:#dcfaf6;color:#0cae9a}
+.settings-section-icon.red{background:#ffe8ec;color:#ef4457}
+/* Make workflow icon tiles a little stronger and easier to scan. */
+.workflow-settings .workflow-card-icon,.settings-workflow-icon,.workflow-card .workflow-card-icon{width:40px!important;height:40px!important;border-radius:12px!important}
+.workflow-settings .workflow-card-icon svg,.settings-workflow-icon svg,.workflow-card .workflow-card-icon svg{width:21px!important;height:21px!important}
+/* Local data is admin-only; JS toggles .is-non-admin on settingsView. */
+#settingsView.is-non-admin .local-settings{display:none!important}
