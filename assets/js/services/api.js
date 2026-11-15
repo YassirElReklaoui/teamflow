@@ -327,6 +327,28 @@
     return ops;
   }
 
+  let sharedDraftDepth=0;
+  let sharedDraftPendingSave=false;
+
+  function beginSharedDraft(){
+    sharedDraftDepth+=1;
+    tfLog('info','Shared draft started',{depth:sharedDraftDepth});
+  }
+
+  function endSharedDraft({commit=false}={}){
+    sharedDraftDepth=Math.max(0,sharedDraftDepth-1);
+    tfLog('info','Shared draft ended',{depth:sharedDraftDepth,commit,pending:sharedDraftPendingSave});
+    if(sharedDraftDepth>0)return;
+    if(commit&&sharedDraftPendingSave){
+      sharedDraftPendingSave=false;
+      scheduleRemoteSave({force:true});
+    }else if(!commit){
+      sharedDraftPendingSave=false;
+    }
+  }
+
+  function sharedDraftActive(){return sharedDraftDepth>0;}
+
   async function saveMinimalChanges(){
     if(!cloudReady||cloudApplyingRemote||deltaSaving)return false;
     const snapshot=clone(state);
@@ -349,8 +371,13 @@
     }finally{deltaSaving=false;if(deltaDirty&&cloudReady){deltaDirty=false;scheduleRemoteSave();}}
   }
   function saveRemoteWorkspace(){return saveMinimalChanges();}
-  function scheduleRemoteSave(){
+  function scheduleRemoteSave({force=false}={}){
     if(!cloudReady||cloudApplyingRemote)return;
+    if(sharedDraftActive()&&!force){
+      sharedDraftPendingSave=true;
+      tfLog('info','Remote save held by open ticket draft');
+      return;
+    }
     deltaDirty=true;clearTimeout(deltaSaveTimer);deltaSaveTimer=setTimeout(()=>saveMinimalChanges(),450);
   }
   async function pollCloud(){
