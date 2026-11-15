@@ -134,128 +134,101 @@
 
   function ticketForm(ticket){
     const otherTickets=state.tickets.filter(t=>t.id!==ticket.id);
+    const assigneeMember=state.members.find(m=>m.name===ticket.assignee);
+    const assigneeInitials=initials(ticket.assignee||"Unassigned");
+    const assigneeColor=assigneeMember?.color||memberColor(ticket.assignee||"Unassigned");
+    const semanticClass=value=>String(value||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
     return `
-      <div class="editor-layout">
-        <section class="editor-card editor-card-template">
-          <div class="editor-two editor-two-top">
-            <div class="field editor-field">
-              <label>${editorIcon('layers')}<span>Template / Issue type</span></label>
-              <select id="ticketType">${Object.keys(TICKET_TEMPLATES).map(v=>`<option ${v===(ticket.type||"Task")?"selected":""}>${esc(v)}</option>`).join("")}</select>
+      <div class="editor-detail-layout">
+        <div class="editor-primary-column">
+          <section class="editor-card editor-card-template editor-section-card">
+            <div class="editor-section-heading">${editorIcon('layers')}<strong>Template / Issue type & Release</strong></div>
+            <div class="editor-two editor-two-top">
+              <div class="field editor-field">
+                <label>${editorIcon('layers')}<span>Template / Issue type</span></label>
+                <select id="ticketType">${Object.keys(TICKET_TEMPLATES).map(v=>`<option ${v===(ticket.type||"Task")?"selected":""}>${esc(v)}</option>`).join("")}</select>
+              </div>
+              <div class="field editor-field">
+                <label>${editorIcon('flag')}<span>Release / Milestone</span></label>
+                <select id="ticketRelease"><option value="">No release</option>${state.releases.map(v=>`<option ${v===(ticket.release||"")?"selected":""}>${esc(v)}</option>`).join("")}</select>
+              </div>
+            </div>
+            <div class="editor-template-note"><span>i</span> Templates can prefill priority, area, labels and description for new tickets.</div>
+          </section>
+
+          <section class="editor-card editor-card-copy editor-section-card">
+            <div class="field editor-field editor-title-field">
+              <label>${editorIcon('title')}<span>Title *</span></label>
+              <input id="ticketTitle" value="${esc(ticket.title||"")}" placeholder="Describe the task" />
             </div>
             <div class="field editor-field">
-              <label>${editorIcon('flag')}<span>Release / Milestone</span></label>
-              <select id="ticketRelease">${state.releases.map(v=>`<option ${v===(ticket.release||"")?"selected":""}>${esc(v)}</option>`).join("")}</select>
+              <label>${editorIcon('file')}<span>Description</span></label>
+              <textarea id="ticketDescription" placeholder="Add details, context, acceptance notes...">${esc(ticket.description||"")}</textarea>
             </div>
-          </div>
-          <div class="editor-template-note"><span>i</span> Templates can prefill priority, area, labels and description for new tickets.</div>
-        </section>
+          </section>
 
-        <section class="editor-card editor-card-copy">
-          <div class="field editor-field">
-            <label>${editorIcon('title')}<span>Title *</span></label>
-            <input id="ticketTitle" value="${esc(ticket.title||"")}" placeholder="Describe the task" />
-          </div>
-          <div class="field editor-field">
-            <label>${editorIcon('file')}<span>Description</span></label>
-            <textarea id="ticketDescription" placeholder="Add details, context, acceptance notes...">${esc(ticket.description||"")}</textarea>
-          </div>
-        </section>
-
-        <section class="editor-card editor-paired-card">
-          <div class="editor-two editor-two-fields">
-            <div class="editor-stack">
-              <div class="field editor-field">
-                <label>${editorIcon('user')}<span>Assignee</span></label>
-                <select id="ticketAssignee">${state.members.length?state.members.map(m=>`<option ${m.name===ticket.assignee?"selected":""}>${esc(m.name)}</option>`).join(""):`<option value="">Unassigned</option>`}</select>
-              </div>
-              <div class="field editor-field">
-                <label>${editorIcon('area')}<span>Area / ARCH / BE / FE</span></label>
-                <select id="ticketArea">${["ARCH","BE","FE","QA"].map(v=>`<option ${v===ticket.area?"selected":""}>${v}</option>`).join("")}</select>
-              </div>
-              <div class="field editor-field">
-                <label>${editorIcon('alert')}<span>Risk / Delivery flag</span></label>
-                <select id="ticketRisk">${["None","At Risk","Blocked"].map(v=>`<option ${v===(ticket.risk||"None")?"selected":""}>${v}</option>`).join("")}</select>
-              </div>
+          <section class="editor-card editor-list-card editor-section-card">
+            <div class="editor-section-heading">${editorIcon('check')}<strong>Checklist / Subtasks</strong><span class="editor-section-meta">${(ticket.subtasks||[]).filter(x=>x.text&&x.done).length} / ${(ticket.subtasks||[]).filter(x=>x.text).length}</span></div>
+            <div id="subtaskRows" class="subtask-list editor-subtask-list">${subtaskRowsHtml(ticket.subtasks||[])}</div>
+            <div class="editor-card-footer">
+              <button id="addSubtaskRow" class="editor-link-button" type="button">+ Add checklist item</button>
+              <label class="editor-auto-progress"><input id="autoProgress" type="checkbox" ${ticket.autoProgress?'checked':''} /><span>Calculate progress from checklist</span></label>
             </div>
-            <div class="editor-stack">
-              <div class="field editor-field">
-                <label>${editorIcon('status')}<span>Status</span></label>
-                <select id="ticketStatus">${state.statuses.map(s=>`<option ${s===ticket.status?"selected":""}>${esc(s)}</option>`).join("")}</select>
-              </div>
-              <div class="field editor-field">
-                <label>${editorIcon('flag')}<span>Priority</span></label>
-                <select id="ticketPriority">${["High","Medium","Low"].map(v=>`<option ${v===ticket.priority?"selected":""}>${v}</option>`).join("")}</select>
-              </div>
-              <div class="field editor-field">
-                <label>${editorIcon('bolt')}<span>Sprint / Wave</span></label>
-                <input id="ticketSprint" value="${esc(ticket.sprint||"")}" />
-              </div>
+          </section>
+
+          <section class="editor-card editor-dependency-card editor-section-card">
+            <div class="field editor-field">
+              <label>${editorIcon('link')}<span>Depends on / Blocked by</span></label>
+              ${dependencyPickerHtml(ticket,otherTickets)}
+              <div class="dependency-note">Search and check one or more tickets. Any unfinished dependency automatically marks this ticket as blocked.</div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="editor-card editor-single-row">
-          <div class="field editor-field">
-            <label>${editorIcon('tag')}<span>Blocker / Risk Note</span></label>
-            <input id="ticketBlockerNote" value="${esc(ticket.blockerNote||"")}" placeholder="What is blocking or putting delivery at risk?" />
-          </div>
-        </section>
+          <section class="editor-card editor-list-card editor-section-card">
+            <div class="editor-section-heading">${editorIcon('link')}<strong>Documentation Links</strong></div>
+            <div id="linkRows" class="link-rows editor-link-rows">${linkRowsHtml(ticket.links||[])}</div>
+            <div class="editor-card-footer editor-doc-footer"><button id="addDocLinkRow" class="editor-link-button" type="button">+ Add documentation link</button><span class="note">Add the URL plus a chapter, section, page, or reference.</span></div>
+          </section>
+        </div>
 
-        <section class="editor-card editor-dependency-card">
-          <div class="field editor-field">
-            <label>${editorIcon('link')}<span>Depends on / Blocked by</span></label>
-            ${dependencyPickerHtml(ticket,otherTickets)}
-            <div class="dependency-note">Search and check one or more tickets. Any unfinished dependency automatically marks this ticket as blocked.</div>
-          </div>
-        </section>
-
-        <section class="editor-card editor-progress-card">
-          <div class="editor-two editor-two-fields">
-            <div class="editor-stack">
-              <div class="field editor-field">
-                <label>${editorIcon('chart')}<span>Progress</span></label>
-                <div class="progress-editor">
-                  <input id="ticketProgressRange" type="range" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" />
-                  <div class="progress-number"><input id="ticketProgress" type="number" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" /><span>%</span></div>
-                </div>
-              </div>
-              <div class="field editor-field">
-                <label>${editorIcon('calendar')}<span>Start date</span></label>
-                <input id="ticketStart" type="date" value="${esc(ticket.start||"")}" />
-              </div>
+        <aside class="editor-properties-column">
+          <section class="editor-side-card editor-assignee-card">
+            <div class="editor-side-heading">${editorIcon('user')}<strong>Assigned to</strong></div>
+            <div class="editor-assignee-control" style="--editor-member-color:${esc(assigneeColor)}">
+              <span class="editor-assignee-avatar" id="ticketAssigneeAvatar">${esc(assigneeInitials)}</span>
+              <div class="editor-assignee-copy"><small>Owner</small><select id="ticketAssignee">${state.members.length?state.members.map(m=>`<option ${m.name===ticket.assignee?"selected":""}>${esc(m.name)}</option>`).join(""):`<option value="">Unassigned</option>`}</select></div>
             </div>
-            <div class="editor-stack">
-              <div class="field editor-field">
-                <label>${editorIcon('tag')}<span>Labels (comma-separated)</span></label>
-                <input id="ticketLabels" value="${esc((ticket.labels||[]).join(", "))}" placeholder="e.g. API, backend, performance" />
-              </div>
-              <div class="field editor-field">
-                <label>${editorIcon('calendar')}<span>Expected end date</span></label>
-                <input id="ticketEnd" type="date" value="${esc(ticket.end||"")}" />
-              </div>
+          </section>
+
+          <section class="editor-side-card editor-key-details-card">
+            <div class="editor-side-heading">${editorIcon('details')}<strong>Key details</strong></div>
+            <div class="editor-key-details">
+              <div class="editor-key-row"><label>${editorIcon('status')}<span>Status</span></label><select id="ticketStatus" class="editor-semantic-select semantic-status-${semanticClass(ticket.status)}">${state.statuses.map(s=>`<option ${s===ticket.status?"selected":""}>${esc(s)}</option>`).join("")}</select></div>
+              <div class="editor-key-row"><label>${editorIcon('flag')}<span>Priority</span></label><select id="ticketPriority" class="editor-semantic-select semantic-priority-${semanticClass(ticket.priority)}">${["High","Medium","Low"].map(v=>`<option ${v===ticket.priority?"selected":""}>${v}</option>`).join("")}</select></div>
+              <div class="editor-key-row"><label>${editorIcon('area')}<span>Area / ARCH / BE / FE</span></label><select id="ticketArea">${["ARCH","BE","FE","QA"].map(v=>`<option ${v===ticket.area?"selected":""}>${v}</option>`).join("")}</select></div>
+              <div class="editor-key-row"><label>${editorIcon('alert')}<span>Risk / Delivery flag</span></label><select id="ticketRisk" class="editor-semantic-select semantic-risk-${semanticClass(ticket.risk||"None")}">${["None","At Risk","Blocked"].map(v=>`<option ${v===(ticket.risk||"None")?"selected":""}>${v}</option>`).join("")}</select></div>
+              <div class="editor-key-row"><label>${editorIcon('bolt')}<span>Sprint / Wave</span></label><input id="ticketSprint" value="${esc(ticket.sprint||"")}" placeholder="e.g. Wave 2" /></div>
+              <div class="editor-key-row editor-key-row-progress"><label>${editorIcon('chart')}<span>Progress</span></label><div class="progress-editor editor-side-progress"><input id="ticketProgressRange" type="range" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" /><div class="progress-number"><input id="ticketProgress" type="number" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" /><span>%</span></div></div></div>
+              <div class="editor-key-row"><label>${editorIcon('calendar')}<span>Start date</span></label><input id="ticketStart" type="date" value="${esc(ticket.start||"")}" /></div>
+              <div class="editor-key-row"><label>${editorIcon('calendar')}<span>Expected end date</span></label><input id="ticketEnd" type="date" value="${esc(ticket.end||"")}" /></div>
             </div>
-          </div>
-        </section>
+            <div class="field editor-field editor-blocker-field">
+              <label>${editorIcon('tag')}<span>Blocker / Risk Note</span></label>
+              <textarea id="ticketBlockerNote" placeholder="What is blocking or putting delivery at risk?">${esc(ticket.blockerNote||"")}</textarea>
+            </div>
+          </section>
 
-        <section class="editor-card editor-list-card">
-          <div class="editor-section-heading">${editorIcon('check')}<strong>Checklist / Subtasks</strong></div>
-          <div id="subtaskRows" class="subtask-list editor-subtask-list">${subtaskRowsHtml(ticket.subtasks||[])}</div>
-          <div class="editor-card-footer">
-            <button id="addSubtaskRow" class="editor-link-button" type="button">+ Add checklist item</button>
-            <label class="editor-auto-progress"><input id="autoProgress" type="checkbox" ${ticket.autoProgress?'checked':''} /><span>Calculate progress from checklist</span></label>
-          </div>
-        </section>
+          <section class="editor-side-card editor-labels-card">
+            <div class="editor-side-heading">${editorIcon('tag')}<strong>Labels</strong></div>
+            <div class="field editor-field"><input id="ticketLabels" value="${esc((ticket.labels||[]).join(", "))}" placeholder="e.g. API, backend, performance" /></div>
+            <div class="editor-label-preview">${(ticket.labels||[]).length?(ticket.labels||[]).map((label,i)=>`<span class="editor-label-chip label-tone-${i%4}">${esc(label)}</span>`).join(""):'<span class="note">No labels yet</span>'}</div>
+          </section>
 
-        <section class="editor-card editor-list-card">
-          <div class="editor-section-heading">${editorIcon('link')}<strong>Documentation Links</strong></div>
-          <div id="linkRows" class="link-rows editor-link-rows">${linkRowsHtml(ticket.links||[])}</div>
-          <div class="editor-card-footer editor-doc-footer"><button id="addDocLinkRow" class="editor-link-button" type="button">+ Add documentation link</button><span class="note">Add the URL plus a chapter, section, page, or reference.</span></div>
-        </section>
-
-        <section class="editor-card editor-list-card editor-collaborator-card">
-          <div class="editor-section-heading">${editorIcon('users')}<strong>Team Members / Collaborators</strong></div>
-          <div class="check-grid editor-collab-grid">${collaboratorChecks(ticket.collaborators)}</div>
-        </section>
+          <section class="editor-side-card editor-collaborator-card">
+            <div class="editor-side-heading">${editorIcon('users')}<strong>Collaborators</strong><span class="editor-side-count">${(ticket.collaborators||[]).length}</span></div>
+            <div class="check-grid editor-collab-grid">${collaboratorChecks(ticket.collaborators)}</div>
+          </section>
+        </aside>
       </div>
     `;
   }
@@ -622,6 +595,15 @@
     };
     progressRange.addEventListener("input",()=>syncProgress(progressRange,progressNumber));
     progressNumber.addEventListener("input",()=>syncProgress(progressNumber,progressRange));
+
+    const semanticSlug=value=>String(value||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+    const refreshSemanticSelect=(select,prefix)=>{if(!select)return;[...select.classList].filter(c=>c.startsWith(prefix)).forEach(c=>select.classList.remove(c));select.classList.add(prefix+semanticSlug(select.value));};
+    const statusSelect=$("#ticketStatus"),prioritySelect=$("#ticketPriority"),riskSelect=$("#ticketRisk");
+    statusSelect?.addEventListener("change",()=>refreshSemanticSelect(statusSelect,"semantic-status-"));
+    prioritySelect?.addEventListener("change",()=>refreshSemanticSelect(prioritySelect,"semantic-priority-"));
+    riskSelect?.addEventListener("change",()=>refreshSemanticSelect(riskSelect,"semantic-risk-"));
+    const assigneeSelect=$("#ticketAssignee"),assigneeAvatar=$("#ticketAssigneeAvatar");
+    assigneeSelect?.addEventListener("change",()=>{const member=state.members.find(m=>m.name===assigneeSelect.value);const wrap=assigneeSelect.closest(".editor-assignee-control");if(assigneeAvatar)assigneeAvatar.textContent=initials(assigneeSelect.value||"Unassigned");if(wrap)wrap.style.setProperty("--editor-member-color",member?.color||memberColor(assigneeSelect.value||"Unassigned"));});
 
     const typeSelect=$("#ticketType");
     if(typeSelect && !existing){
