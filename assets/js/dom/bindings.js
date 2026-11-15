@@ -163,7 +163,8 @@
   $("#settingsTheme").addEventListener("click",()=>setTheme(state.theme==="dark"?"light":"dark"));
   $("#settingsMembersShortcut")?.addEventListener("click",()=>switchView("team"));
   $("#settingsArchiveShortcut")?.addEventListener("click",()=>switchView("archive"));
-  $("#settingsBackupShortcut")?.addEventListener("click",()=>$(".backup-settings")?.scrollIntoView({behavior:"smooth",block:"center"}));
+  $("#settingsBackupShortcut")?.addEventListener("click",async()=>{const btn=$("#settingsBackupShortcut");if(btn)btn.disabled=true;try{await createWorkspaceBackup('Manual backup');$(".backup-settings")?.scrollIntoView({behavior:"smooth",block:"center"});}finally{if(btn)btn.disabled=false;}});
+  $("#createBackupNow")?.addEventListener("click",async()=>{const btn=$("#createBackupNow");if(btn)btn.disabled=true;try{await createWorkspaceBackup('Manual backup');}finally{if(btn)btn.disabled=false;}});
 
   // Identity follows the authenticated TeamFlow account; there is no manual "Viewing as" switch.
   renderViewAsAvatarMenu();

@@ -242,12 +242,15 @@
   function renderBackups(){
     const el=$("#backupList"); if(!el) return;
     const backups=getBackups();
-    el.innerHTML=backups.length?backups.map((b,i)=>`<div class="backup-row"><div style="min-width:0;flex:1"><strong>${new Date(b.ts).toLocaleString('en-GB')}</strong><small>${esc(b.label||'Snapshot')}</small></div><button class="btn small" type="button" data-restore-backup="${i}">Restore</button></div>`).join(''):'<div class="note">Browser snapshots are disabled in secure mode. Shared recovery is handled by server-side history and TeamFlow activity.</div>';
-    $$('[data-restore-backup]').forEach(btn=>btn.addEventListener('click',async()=>{
-      const b=getBackups()[Number(btn.dataset.restoreBackup)];if(!b)return;
-      const ok=await confirmAction({title:"Restore this snapshot?",message:"Your current TeamFlow data will be replaced by the selected saved snapshot.",subject:new Date(b.ts).toLocaleString('en-GB'),confirmLabel:"Restore snapshot",icon:"↶",details:[b.label||"Snapshot","Current unsaved differences will be replaced."],warning:"Export the current board first if you may need it later."});
-      if(!ok)return;
-      try{state=JSON.parse(b.data);if(!Array.isArray(state.releases))state.releases=[];state.tickets.forEach(t=>{if(!t.type)t.type='Task';if(!t.release)t.release=t.sprint||state.releases[0]||'';if(!t.risk)t.risk='None';if(!Array.isArray(t.dependencies))t.dependencies=[];});saveState();renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderReleaseEditor();renderBackups();toast('Snapshot restored');}catch(err){tfLogError('Snapshot restore failed',err);await noticeAction({title:'Snapshot could not be restored',message:'The saved snapshot is invalid or incomplete, so TeamFlow left your current workspace unchanged.',icon:'↶'});}
+    el.innerHTML=backups.length?backups.map(b=>`<article class="backup-card">
+      <div class="backup-card-icon">↶</div>
+      <div class="backup-card-main"><div class="backup-card-top"><strong>${esc(b.label||'Workspace backup')}</strong><span>${new Date(b.createdAt||b.ts).toLocaleString('en-GB')}</span></div><div class="backup-card-meta"><span>by ${esc(b.createdBy||'admin')}</span><span>${Number(b.counts?.tickets||0)} tickets</span><span>${Number(b.counts?.members||0)} members</span><span>${Number(b.counts?.documents||0)} documents</span></div></div>
+      <button class="btn small" type="button" data-restore-backup-id="${esc(b.id)}">Restore</button>
+    </article>`).join(''):'<div class="backup-empty"><span>↶</span><strong>No backups yet</strong><small>Create a full workspace snapshot before major imports, bulk edits or configuration changes.</small></div>';
+    $$('[data-restore-backup-id]').forEach(btn=>btn.addEventListener('click',async()=>{
+      const b=getBackups().find(x=>String(x.id)===String(btn.dataset.restoreBackupId));if(!b)return;
+      const ok=await confirmAction({title:'Restore this backup?',message:'TeamFlow will replace the current shared workspace with this server snapshot.',subject:b.label||new Date(b.createdAt).toLocaleString('en-GB'),confirmLabel:'Restore backup',icon:'↶',details:[new Date(b.createdAt).toLocaleString('en-GB'),`Created by ${b.createdBy||'admin'}`,`${b.counts?.tickets||0} tickets · ${b.counts?.members||0} members`],warning:'Current shared data will be replaced. Create a new backup first if you may need the current state.'});
+      if(!ok)return;btn.disabled=true;btn.textContent='Restoring…';try{await restoreWorkspaceBackup(b.id);refreshDataViews();renderTeam();renderStatusEditor();renderReleaseEditor();toast('Workspace restored from backup');}catch(err){tfLogError('Backup restore failed',err,{backupId:b.id});toast('Backup could not be restored');}finally{btn.disabled=false;btn.textContent='Restore';}
     }));
     renderSettingsSummary();
   }
@@ -277,7 +280,7 @@
     if(name==="mywork") renderMyWork();
     if(name==="insights") renderInsights();
     if(name==="archive") renderArchivedTickets();
-    if(name==="settings"){renderStatusEditor();renderWipEditor();renderReleaseEditor();renderBackups();renderSettingsSummary();}
+    if(name==="settings"){renderStatusEditor();renderWipEditor();renderReleaseEditor();renderBackups();renderSettingsSummary();if(cloudUser?.role==="admin")loadBackups({quiet:true}).then(()=>{renderBackups();renderSettingsSummary();});}
   }
 
   function addDocument(doc){

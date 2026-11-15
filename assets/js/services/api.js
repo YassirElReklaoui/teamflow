@@ -480,6 +480,7 @@
     try{
       const me=await cloudRequest("/auth/me");cloudUser=me.user;cloudReady=true;
       const loaded=await loadRemoteWorkspace({quiet:true});if(!loaded)throw new Error(cloudLastError||"Could not load workspace");
+      if(cloudUser?.role==="admin")await loadBackups({quiet:true});
       setSyncStatus("connected","Sync · connected",`Signed in as ${cloudUser.displayName||cloudUser.username}`);
       clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,Number(cloudConfig.pollMs||10000));
       updateCloudSettingsCard();
@@ -578,7 +579,24 @@
     document.addEventListener("visibilitychange",()=>{if(!document.hidden)pollCloud();});
   }
 
-  function getBackups(){return [];}
+  let serverBackups=[];
+  function getBackups(){return serverBackups;}
+  async function loadBackups({quiet=true}={}){
+    if(!cloudReady||cloudUser?.role!=="admin"){serverBackups=[];return serverBackups;}
+    try{const data=await cloudRequest('/admin/backups');serverBackups=Array.isArray(data.backups)?data.backups:[];return serverBackups;}
+    catch(err){if(!quiet)tfLogError('Loading backups failed',err);return serverBackups;}
+  }
+  async function createWorkspaceBackup(label='Manual backup'){
+    if(cloudUser?.role!=="admin"){toast('Administrator access required');return null;}
+    try{setSyncStatus('saving','Backup · creating…');const data=await cloudRequest('/admin/backups',{method:'POST',body:{label}});serverBackups=Array.isArray(data.backups)?data.backups:serverBackups;renderBackups();renderSettingsSummary();setSyncStatus('connected','Sync · connected');toast('Workspace backup created');return data.backup||null;}
+    catch(err){tfLogError('Creating workspace backup failed',err);setSyncStatus('error','Backup · failed',err.message);toast('Backup could not be created');return null;}
+  }
+  async function restoreWorkspaceBackup(id){
+    if(cloudUser?.role!=="admin")throw new Error('Administrator access required');
+    const result=await cloudRequest(`/admin/backups/${encodeURIComponent(id)}/restore`,{method:'POST'});
+    cloudVersion=Number(result.version||cloudVersion);cloudLastStamp=result.updatedAt||new Date().toISOString();
+    await loadRemoteWorkspace({quiet:true});await loadBackups({quiet:true});renderBackups();renderSettingsSummary();return result;
+  }
   function rememberPreviousState(){/* Shared data is intentionally not persisted in browser storage. */}
   function saveState(){
     let localOk=true;

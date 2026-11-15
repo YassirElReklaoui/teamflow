@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
   <title>TeamFlow — Global Investigation System</title>
-  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-settings-ui-1" />
-    <script src="./assets/js/services/api.js?v=20261115-release-archive-1" defer></script>
-  <script src="./assets/js/core/runtime.js?v=20261115-release-archive-1" defer></script>
-  <script src="./assets/js/services/domain.js?v=20261115-release-archive-1" defer></script>
-  <script src="./assets/js/ui/views.js?v=20261115-release-archive-1" defer></script>
-  <script src="./assets/js/ui/editors.js?v=20261115-release-archive-1" defer></script>
-  <script src="./assets/js/ui/documents.js?v=20261115-settings-ui-1" defer></script>
-  <script src="./assets/js/ui/notifications.js?v=20261115-release-archive-1" defer></script>
-  <script src="./assets/js/dom/bindings.js?v=20261115-release-archive-1" defer></script>
-  <script src="./assets/js/bootstrap.js?v=20261115-release-archive-1" defer></script>
+  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-settings-full-2" />
+    <script src="./assets/js/services/api.js?v=20261115-settings-full-2" defer></script>
+  <script src="./assets/js/core/runtime.js?v=20261115-settings-full-2" defer></script>
+  <script src="./assets/js/services/domain.js?v=20261115-settings-full-2" defer></script>
+  <script src="./assets/js/ui/views.js?v=20261115-settings-full-2" defer></script>
+  <script src="./assets/js/ui/editors.js?v=20261115-settings-full-2" defer></script>
+  <script src="./assets/js/ui/documents.js?v=20261115-settings-full-2" defer></script>
+  <script src="./assets/js/ui/notifications.js?v=20261115-settings-full-2" defer></script>
+  <script src="./assets/js/dom/bindings.js?v=20261115-settings-full-2" defer></script>
+  <script src="./assets/js/bootstrap.js?v=20261115-settings-full-2" defer></script>
 </head>
 <body>
 <div class="app">
@@ -386,7 +386,8 @@
               <div id="releaseEditor" class="release-editor settings-list"></div>
             </div>
             <div class="setting settings-card settings-wide backup-settings">
-              <div class="setting-head"><span class="setting-icon teal">↶</span><div><h3>Backup history</h3><p>Persistent browser copies of shared data are disabled for security. Use TeamFlow activity and server-side history for recovery/audit.</p></div></div>
+              <div class="setting-head backup-setting-head"><span class="setting-icon teal">↶</span><div><h3>Backup history</h3><p>Create full server snapshots of TeamFlow data and restore them when needed.</p></div><button class="btn primary backup-create-btn" id="createBackupNow" type="button">＋ Create backup</button></div>
+              <div class="backup-safety-note"><span>✓</span><div><strong>Full workspace snapshot</strong><small>Includes tickets, members, comments, documents, workflows, releases, settings, notifications and user state.</small></div></div>
               <div id="backupList" class="backup-list backup-grid"></div>
             </div>
           </div>

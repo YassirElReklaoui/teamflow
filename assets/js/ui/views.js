@@ -469,7 +469,16 @@
     const root=$("#archiveTickets");if(!root)return;
     const tickets=(state.tickets||[]).filter(t=>t.archived);
     if($("#archiveCount"))$("#archiveCount").textContent=tickets.length;
-    root.innerHTML=tickets.length?tickets.map(t=>`<article class="archive-ticket-card" data-archive-ticket="${esc(t.id)}"><div class="archive-ticket-icon">${ticketMetaIcon('ticket')}</div><div class="archive-ticket-main"><div class="archive-ticket-top"><span># ${esc(t.id)}</span><span class="status-dot-label">${esc(t.status||'—')}</span></div><strong>${esc(t.title||'Untitled ticket')}</strong><div class="archive-ticket-meta"><span>${esc(t.assignee||'Unassigned')}</span><span>${esc(t.release||'No release')}</span><span>${esc(t.priority||'—')}</span></div></div><div class="archive-ticket-actions"><button class="btn small" type="button" data-open-archived="${esc(t.id)}">Open</button><button class="btn small primary" type="button" data-restore-archived="${esc(t.id)}">Restore</button></div></article>`).join(''):'<div class="archive-empty"><strong>No archived tickets</strong><span>Archived tickets will appear here without changing their workflow or release.</span></div>';
+    const priorityTone=p=>String(p||'').toLowerCase()==='high'?'high':String(p||'').toLowerCase()==='low'?'low':'medium';
+    root.innerHTML=tickets.length?tickets.map(t=>`<article class="archive-ticket-card" data-archive-ticket="${esc(t.id)}">
+      <div class="archive-ticket-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4zM3 4h18v3H3zM9 11h6"/></svg></div>
+      <div class="archive-ticket-main">
+        <div class="archive-ticket-top"><span class="archive-id">${esc(t.id)}</span><span class="archive-status">${workflowIcon(t.status||'To be started')} ${esc(t.status||'—')}</span></div>
+        <strong class="archive-title">${esc(t.title||'Untitled ticket')}</strong>
+        <div class="archive-ticket-meta"><span>${esc(t.assignee||'Unassigned')}</span><span>${esc(t.release||'No release')}</span><span class="archive-priority ${priorityTone(t.priority)}">${esc(t.priority||'Medium')}</span></div>
+      </div>
+      <div class="archive-ticket-actions"><button class="btn small" type="button" data-open-archived="${esc(t.id)}">Open</button><button class="btn small primary" type="button" data-restore-archived="${esc(t.id)}">Restore</button></div>
+    </article>`).join(''):'<div class="archive-empty"><span class="archive-empty-icon">✓</span><strong>No archived tickets</strong><span>Archived tickets will appear here without changing their workflow or release.</span></div>';
     $$('[data-open-archived]').forEach(btn=>btn.addEventListener('click',()=>openTicketModal(btn.dataset.openArchived)));
     $$('[data-restore-archived]').forEach(btn=>btn.addEventListener('click',()=>{const t=state.tickets.find(x=>x.id===btn.dataset.restoreArchived);if(!t)return;t.archived=false;t.history=t.history||[];t.history.unshift('Ticket restored from archive');logActivity('update',t,'Restored ticket from archive');saveState();refreshDataViews();renderArchivedTickets();toast(`${t.id} restored`);}));
   }
@@ -496,24 +505,31 @@
     const isAdmin=cloudUser?.role==="admin";
     const order=isAdmin?currentWorkflowOrderDraft():savedOrder;
     const dirty=isAdmin&&workflowOrderDraftChanged();
-    $("#statusEditor").innerHTML = order.map((statusName,i)=>{
-      const count=state.tickets.filter(t=>t.status===statusName).length;
+    const tones=['violet','green','amber','purple','pink','teal','slate'];
+    $("#statusEditor").innerHTML = `<div class="workflow-card-strip">${order.map((statusName,i)=>{
+      const count=state.tickets.filter(t=>t.status===statusName&&!t.archived).length;
       const sharedIndex=state.statuses.indexOf(statusName);
-      return `
-      <div class="status-setting-row">
-        <div class="status-setting-main"><span class="settings-workflow-icon">${workflowIconSvg(workflowIconKey(statusName))}</span><div><strong>${esc(statusName)}</strong><small>${count} ticket${count===1?"":"s"} · ${esc(WORKFLOW_ICON_LIBRARY[workflowIconKey(statusName)]?.label||"General")} · ${dirty?`Draft position ${i+1}`:`Saved position ${i+1}`}</small></div></div>
-        <div class="work-order-actions">
-          ${isAdmin?`<button class="btn small" type="button" data-board-status-move="up" data-board-status="${esc(statusName)}" ${i===0?"disabled":""} title="Move workflow left in draft">←</button>
-          <button class="btn small" type="button" data-board-status-move="down" data-board-status="${esc(statusName)}" ${i===order.length-1?"disabled":""} title="Move workflow right in draft">→</button>`:'<span class="note">Admin controlled</span>'}
-          ${isAdmin?`<button class="btn small status-remove-btn" type="button" data-remove-status="${sharedIndex}" ${state.statuses.length<=1?"disabled":""}>Remove</button>`:''}
-        </div>
-      </div>`;
-    }).join("") + (isAdmin?`<div class="workflow-order-savebar" style="display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:14px 2px 2px;border-top:1px solid var(--border);margin-top:10px"><span class="note" style="margin-right:auto">${dirty?'Unsaved workflow order. Nothing is sent until you save.':'Saved workflow order'}</span>${dirty?'<button class="btn" id="discardWorkflowOrder" type="button">Discard</button><button class="btn primary" id="saveWorkflowOrder" type="button">Save order</button>':''}</div>`:'');
+      const tone=tones[i%tones.length];
+      return `<article class="workflow-setting-card tone-${tone}" draggable="${isAdmin?'true':'false'}" data-workflow-card="${esc(statusName)}">
+        <div class="workflow-card-top"><span class="workflow-card-icon">${workflowIconSvg(workflowIconKey(statusName))}</span>${isAdmin?'<span class="workflow-drag-handle" title="Drag to reorder">⋮⋮</span>':''}</div>
+        <strong>${esc(statusName)}</strong>
+        <div class="workflow-card-stats"><span>${count} ticket${count===1?'':'s'}</span><span class="workflow-position-dot"></span><span>${dirty?'Draft':'Saved'} position ${i+1}</span></div>
+        ${isAdmin?`<button class="workflow-remove-action" type="button" data-remove-status="${sharedIndex}" ${state.statuses.length<=1?'disabled':''}>⌫ Remove</button>`:'<span class="workflow-admin-label">Admin controlled</span>'}
+      </article>`;
+    }).join('')}</div>${isAdmin?`<div class="workflow-order-savebar ${dirty?'dirty':''}"><div><strong>${dirty?'Workflow order changed':'Workflow order saved'}</strong><span>${dirty?'Drag cards into place, then save once to share the order with everyone.':'Drag any workflow card to start a new order.'}</span></div><div>${dirty?'<button class="btn" id="discardWorkflowOrder" type="button">Discard</button><button class="btn primary" id="saveWorkflowOrder" type="button">✓ Save order</button>':''}</div></div>`:''}`;
 
-    $$('[data-board-status-move]').forEach(btn=>btn.addEventListener('click',()=>moveWorkflowDraft(btn.dataset.boardStatus,btn.dataset.boardStatusMove)));
+    if(isAdmin){
+      let dragged='';
+      $$('[data-workflow-card]').forEach(card=>{
+        card.addEventListener('dragstart',e=>{dragged=card.dataset.workflowCard||'';card.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',dragged);});
+        card.addEventListener('dragend',()=>{card.classList.remove('dragging');$$('[data-workflow-card]').forEach(x=>x.classList.remove('drag-over'));dragged='';});
+        card.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';if(card.dataset.workflowCard!==dragged)card.classList.add('drag-over');});
+        card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
+        card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('drag-over');const source=e.dataTransfer.getData('text/plain')||dragged,target=card.dataset.workflowCard;if(!source||!target||source===target)return;const next=currentWorkflowOrderDraft().slice();const from=next.indexOf(source),to=next.indexOf(target);if(from<0||to<0)return;next.splice(from,1);next.splice(to,0,source);workflowOrderDraft=next;tfLog('info','Workflow order draft changed by drag',{order:[...next]});renderStatusEditor();});
+      });
+    }
     $("#saveWorkflowOrder")?.addEventListener("click",saveWorkflowOrderDraft);
     $("#discardWorkflowOrder")?.addEventListener("click",discardWorkflowOrderDraft);
     $$('[data-remove-status]').forEach(btn=>btn.addEventListener("click",()=>openRemoveWorkflowModal(Number(btn.dataset.removeStatus))));
     renderSettingsSummary();
   }
-
