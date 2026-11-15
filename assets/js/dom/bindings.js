@@ -113,7 +113,29 @@
   $('#cancelBulk')?.addEventListener('click',()=>{bulkMode=false;bulkSelected.clear();renderBoard();});
   $('#bulkSelectVisible')?.addEventListener('click',()=>{const visible=state.tickets.filter(ticketMatches),allSelected=visible.length>0&&visible.every(t=>bulkSelected.has(t.id));visible.forEach(t=>allSelected?bulkSelected.delete(t.id):bulkSelected.add(t.id));renderBoard();toast(allSelected?'Visible selection cleared':`${visible.length} visible ticket${visible.length===1?'':'s'} selected`);});
   $('#bulkClearSelection')?.addEventListener('click',()=>{bulkSelected.clear();renderBoard();});
-  $('#applyBulk')?.addEventListener('click',()=>{if(!bulkSelected.size){toast('Select at least one ticket');return;}const values={status:$('#bulkStatus').value,assignee:$('#bulkAssignee').value,release:$('#bulkRelease').value,priority:$('#bulkPriority').value,progress:$('#bulkProgress').value,end:$('#bulkEnd').value};let changed=0;state.tickets.filter(t=>bulkSelected.has(t.id)).forEach(t=>{const changes=[];if(values.status){changes.push(`status ${t.status} → ${values.status}`);t.status=values.status;}if(values.assignee)t.assignee=values.assignee;if(values.release)t.release=values.release;if(values.priority)t.priority=values.priority;if(values.progress!=='')t.progress=normalizeProgress(values.progress);if(values.end)t.end=values.end;t.history=t.history||[];t.history.unshift('Bulk updated');logActivity('update',t,`Bulk updated${changes.length?' · '+changes.join(', '):''}`);changed++;});saveState();bulkSelected.clear();bulkMode=false;refreshDataViews();toast(`${changed} ticket${changed===1?'':'s'} updated`);});
+  $('#applyBulk')?.addEventListener('click',async()=>{
+    if(!bulkSelected.size){toast('Select at least one ticket');return;}
+    const values={status:$('#bulkStatus').value,assignee:$('#bulkAssignee').value,release:$('#bulkRelease').value,priority:$('#bulkPriority').value,progress:$('#bulkProgress').value,end:$('#bulkEnd').value};
+    const changes={};
+    if(values.status)changes.status=values.status;
+    if(values.assignee)changes.assignee=values.assignee;
+    if(values.release)changes.release=values.release;
+    if(values.priority)changes.priority=values.priority;
+    if(values.progress!=='')changes.progress=normalizeProgress(values.progress);
+    if(values.end)changes.end=values.end;
+    if(!Object.keys(changes).length){toast('Choose at least one field to update');return;}
+    const ids=[...bulkSelected];
+    const apply=$('#applyBulk');if(apply){apply.disabled=true;apply.classList.add('is-loading');}
+    try{
+      const result=await bulkPatchTickets(ids,changes);
+      bulkSelected.clear();bulkMode=false;refreshDataViews();
+      toast(`${Number(result.updated||ids.length)} ticket${Number(result.updated||ids.length)===1?'':'s'} updated in one bulk change`);
+    }catch(err){
+      toast(err?.message||'Bulk update failed');
+    }finally{
+      if(apply){apply.disabled=false;apply.classList.remove('is-loading');}
+    }
+  });
 
   $('#dataMenuBtn')?.addEventListener('click',e=>{
     e.stopPropagation();

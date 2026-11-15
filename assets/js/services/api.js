@@ -419,6 +419,43 @@
     }
     deltaDirty=true;clearTimeout(deltaSaveTimer);deltaSaveTimer=setTimeout(()=>saveMinimalChanges(),450);
   }
+  async function bulkPatchTickets(ticketIds,changes){
+    const ids=[...new Set((ticketIds||[]).map(id=>String(id||'').trim()).filter(Boolean))];
+    const patch=Object.fromEntries(Object.entries(changes||{}).filter(([,v])=>v!==undefined));
+    if(!ids.length)throw new Error('Select at least one ticket');
+    if(!Object.keys(patch).length)throw new Error('Choose at least one field to update');
+    if(!cloudReady)throw Object.assign(new Error('TeamFlow is not connected'),{status:0});
+    setSyncStatus('saving','Sync · bulk updating…',`${ids.length} tickets`);
+    try{
+      tfLog('info','Sending one bulk ticket patch',{count:ids.length,fields:Object.keys(patch)});
+      const result=await cloudRequest('/tickets/bulk',{method:'PATCH',body:{ticketIds:ids,changes:patch}});
+      for(const ticket of (state.tickets||[])){
+        if(!ids.includes(String(ticket.id)))continue;
+        Object.assign(ticket,patch);
+        if(Object.prototype.hasOwnProperty.call(patch,'progress'))ticket.progress=normalizeProgress(patch.progress);
+      }
+      cloudVersion=Number(result.version||cloudVersion);
+      cloudLastStamp=result.updatedAt||new Date().toISOString();
+      cloudLastError='';
+      cloudBaselineState=clone(state);
+      deltaDirty=false;
+      setSyncStatus('saved','Sync · bulk saved',`${Number(result.updated||ids.length)} tickets · version ${cloudVersion}`);
+      setTimeout(()=>{if(!deltaSaving)setSyncStatus('connected','Sync · connected');},900);
+      return result;
+    }catch(err){
+      cloudLastError=String(err?.message||err);
+      tfLogError('Bulk ticket update failed',err,{count:ids.length,fields:Object.keys(patch)});
+      if(isExpiredSessionError(err)){
+        clearCloudToken();cloudReady=false;showAuthGate('Your session expired. Sign in again.');setSyncStatus('error','Sync · sign in required',cloudLastError);
+      }else if(isTransientServiceError(err)){
+        handleTemporaryServiceFailure(err,'Bulk update');
+      }else{
+        setSyncStatus('error','Sync · bulk update failed',cloudLastError);
+      }
+      throw err;
+    }
+  }
+
   async function pollCloud(){
     if(document.hidden||deltaSaving||cloudApplyingRemote||deltaDirty||!cloudReady)return;
     try{const info=await cloudRequest(`/changes?since=${encodeURIComponent(cloudVersion)}`);if(info.changed){const loaded=await loadRemoteWorkspace({quiet:true});if(loaded)window.teamFlowNotificationsOnVersionChanged?.(info);}}
