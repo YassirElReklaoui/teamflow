@@ -33,7 +33,7 @@
         </div>
       </div>`;
     const close=()=>$("#modalRoot").innerHTML="";
-    $("#closeModal").addEventListener("click",close);
+    $("#closeModal").addEventListener("click",()=>close(false));
     $("#cancelWorkflowRemove").addEventListener("click",close);
     $(".modal-backdrop").addEventListener("click",e=>{if(e.target===e.currentTarget)close();});
     $("#confirmWorkflowRemove").addEventListener("click",()=>{
@@ -85,8 +85,8 @@
         <span class="editor-collab-trigger-copy"><small>Team members</small><strong id="editorCollabSummary">${selectedMembers.length?`${selectedMembers.length} selected`:'Select collaborators…'}</strong></span><span class="editor-collab-chevron">⌄</span>
       </button>
       <div class="editor-collab-menu hidden" id="editorCollabMenu">
-        <div class="editor-collab-search-wrap"><input id="editorCollabSearch" type="search" placeholder="Search team members…" autocomplete="off" /></div>
         <div class="editor-collab-options">${state.members.map(m=>`<label class="editor-collab-option" data-collab-search="${esc(String(m.name||'').toLowerCase())}"><input type="checkbox" name="collab" value="${esc(m.name)}" ${set.has(m.name)?'checked':''}/><span class="editor-collab-avatar" style="--member-color:${esc(m.color||memberColor(m.name))}">${esc(initials(m.name))}</span><span class="editor-collab-option-copy"><strong>${esc(m.name)}</strong><small>${esc(m.role||'Team member')}</small></span><span class="editor-collab-check">✓</span></label>`).join('')}</div>
+        <div class="editor-collab-search-wrap"><input id="editorCollabSearch" type="search" placeholder="Search team members…" autocomplete="off" /></div>
       </div>
       <div class="editor-collab-selected" id="editorCollabSelected">${selectedMembers.length?selectedMembers.map(m=>`<span class="editor-selected-person" style="--member-color:${esc(m.color||memberColor(m.name))}"><span>${esc(initials(m.name))}</span><strong>${esc(m.name)}</strong></span>`).join(''):'<span class="note">No collaborators selected</span>'}</div>
     </div>`;
@@ -424,7 +424,7 @@
         </div>
       </div>`;
     const close=()=>{ticketDetailStack=[];$("#modalRoot").innerHTML="";};
-    $("#closeModal").addEventListener("click",close);
+    $("#closeModal").addEventListener("click",()=>close(false));
     $("#detailCloseBtn").addEventListener("click",close);
     $(".modal-backdrop").addEventListener("click",e=>{if(e.target===e.currentTarget)close();});
     $$('[data-detail-collapse]').forEach(btn=>btn.addEventListener('click',()=>btn.closest('.detail-section')?.classList.toggle('collapsed')));
@@ -503,6 +503,8 @@
       labels:[],links:[],comments:[],history:["Ticket created"]
     };
 
+    beginSharedDraft();
+
     $("#modalRoot").innerHTML = `
       <div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="${existing?"Edit ticket":"Create ticket"}">
         <div class="modal ticket-editor-modal">
@@ -549,14 +551,19 @@
 
     let dependencyOutsideHandler=null;
     let collaboratorOutsideHandler=null;
-    const close = ()=>{
+    let draftSessionClosed=false;
+    const close = (commit=false)=>{
+      if(draftSessionClosed)return;
+      draftSessionClosed=true;
       if(dependencyOutsideHandler) document.removeEventListener("pointerdown",dependencyOutsideHandler,true);
       if(collaboratorOutsideHandler) document.removeEventListener("pointerdown",collaboratorOutsideHandler,true);
+      const floatingMenu=$("#editorCollabMenu");if(floatingMenu&&floatingMenu.parentElement===document.body)floatingMenu.remove();
+      endSharedDraft({commit});
       $("#modalRoot").innerHTML="";
     };
-    $("#closeModal").addEventListener("click",close);
-    $("#cancelTicket").addEventListener("click",close);
-    $(".modal-backdrop").addEventListener("click",e=>{if(e.target===e.currentTarget) close();});
+    $("#closeModal").addEventListener("click",()=>close(false));
+    $("#cancelTicket").addEventListener("click",()=>close(false));
+    $(".modal-backdrop").addEventListener("click",e=>{if(e.target===e.currentTarget) close(false);});
 
     $$(".tab").forEach(btn=>{
       btn.addEventListener("click",()=>{
@@ -625,19 +632,35 @@
     $("#assignTicketToMe")?.addEventListener("click",()=>{const self=linkedMemberForCurrentUser();if(!self||!assigneeSelect)return;assigneeSelect.value=self.name;assigneeSelect.dispatchEvent(new Event("change",{bubbles:true}));toast(`Assigned to ${self.name}`);});
 
     const collabPicker=$("#editorCollabPicker"),collabTrigger=$("#editorCollabTrigger"),collabMenu=$("#editorCollabMenu"),collabSearch=$("#editorCollabSearch");
+    const collabSelectedBox=$("#editorCollabSelected");
+    const selectedCollaboratorInputs=()=>collabMenu?$$('input[name="collab"]:checked',collabMenu):[];
     const refreshCollaboratorSummary=()=>{
-      if(!collabPicker)return;const selected=$$('input[name="collab"]:checked',collabPicker);
+      if(!collabPicker)return;const selected=selectedCollaboratorInputs();
       const count=$("#editorCollabCount");if(count)count.textContent=String(selected.length);
       const summary=$("#editorCollabSummary");if(summary)summary.textContent=selected.length?`${selected.length} selected`:'Select collaborators…';
       const box=$("#editorCollabSelected");if(box)box.innerHTML=selected.length?selected.map(input=>{const m=state.members.find(x=>x.name===input.value);return `<span class="editor-selected-person" style="--member-color:${esc(m?.color||memberColor(input.value))}"><span>${esc(initials(input.value))}</span><strong>${esc(input.value)}</strong></span>`;}).join(''):'<span class="note">No collaborators selected</span>';
     };
-    const closeCollaboratorMenu=()=>{collabMenu?.classList.add("hidden");collabTrigger?.setAttribute("aria-expanded","false");};
+    const positionCollaboratorMenu=()=>{
+      if(!collabMenu||!collabTrigger||collabMenu.classList.contains('hidden'))return;
+      const r=collabTrigger.getBoundingClientRect();
+      collabMenu.style.width=`${Math.max(280,r.width)}px`;
+      collabMenu.style.left=`${Math.min(Math.max(10,r.left),window.innerWidth-Math.max(280,r.width)-10)}px`;
+      collabMenu.style.visibility='hidden';
+      collabMenu.style.top='10px';
+      requestAnimationFrame(()=>{const h=Math.min(collabMenu.scrollHeight,360);const above=r.top-10;const top=above>=h?r.top-h-8:Math.min(window.innerHeight-h-10,r.bottom+8);collabMenu.style.top=`${Math.max(10,top)}px`;collabMenu.style.visibility='visible';});
+    };
+    const closeCollaboratorMenu=()=>{
+      if(!collabMenu)return;collabMenu.classList.add("hidden");collabMenu.classList.remove('editor-collab-floating');collabMenu.removeAttribute('style');
+      if(collabPicker&&collabSelectedBox)collabPicker.insertBefore(collabMenu,collabSelectedBox);
+      collabTrigger?.setAttribute("aria-expanded","false");
+    };
     if(collabPicker&&collabTrigger&&collabMenu){
-      collabTrigger.addEventListener("click",()=>{const opening=collabMenu.classList.contains("hidden");if(opening){collabMenu.classList.remove("hidden");collabTrigger.setAttribute("aria-expanded","true");setTimeout(()=>collabSearch?.focus(),0);}else closeCollaboratorMenu();});
-      collabSearch?.addEventListener("input",()=>{const q=collabSearch.value.trim().toLowerCase();$$('.editor-collab-option',collabPicker).forEach(row=>row.classList.toggle('hidden',q&&!row.dataset.collabSearch.includes(q)));});
-      $$('input[name="collab"]',collabPicker).forEach(input=>input.addEventListener('change',refreshCollaboratorSummary));
-      collaboratorOutsideHandler=e=>{if(!collabMenu.classList.contains("hidden")&&!collabPicker.contains(e.target))closeCollaboratorMenu();};
+      collabTrigger.addEventListener("click",()=>{const opening=collabMenu.classList.contains("hidden");if(opening){document.body.appendChild(collabMenu);collabMenu.classList.add('editor-collab-floating');collabMenu.classList.remove("hidden");collabTrigger.setAttribute("aria-expanded","true");positionCollaboratorMenu();setTimeout(()=>collabSearch?.focus(),0);}else closeCollaboratorMenu();});
+      collabSearch?.addEventListener("input",()=>{const q=collabSearch.value.trim().toLowerCase();$$('.editor-collab-option',collabMenu).forEach(row=>row.classList.toggle('hidden',q&&!row.dataset.collabSearch.includes(q)));});
+      $$('input[name="collab"]',collabMenu).forEach(input=>input.addEventListener('change',refreshCollaboratorSummary));
+      collaboratorOutsideHandler=e=>{if(!collabMenu.classList.contains("hidden")&&!collabPicker.contains(e.target)&&!collabMenu.contains(e.target))closeCollaboratorMenu();};
       document.addEventListener("pointerdown",collaboratorOutsideHandler,true);
+      window.addEventListener('resize',positionCollaboratorMenu,{passive:true});
       refreshCollaboratorSummary();
     }
 
@@ -686,21 +709,15 @@
     $("#sendComment").addEventListener("click",()=>{
       const text = $("#commentText").value.trim();
       if(!text) return;
-      const target = existing ? state.tickets.find(t=>t.id===ticketId) : draft;
-      target.comments = target.comments || [];
-      target.comments.push({id:"c"+Date.now()+Math.random().toString(36).slice(2,5),by:state.currentMember || "Team member",at:nowLabel(),text,reactions:{}});
-      target.history = target.history || [];
-      target.history.unshift("Comment added");
-      if(existing) logActivity('comment',target,`Commented: ${text.slice(0,80)}`);
-      if(existing){
-        saveState();
-        close();
-        renderBoard();
-        openTicketModal(ticketId);
-      }else{
-        $("#commentText").value="";
-        toast("Comment will be saved with the new ticket");
-      }
+      draft.comments = draft.comments || [];
+      draft.comments.push({id:"c"+Date.now()+Math.random().toString(36).slice(2,5),by:state.currentMember || "Team member",at:nowLabel(),text,reactions:{}});
+      draft.history = draft.history || [];
+      draft.history.unshift("Comment added");
+      $("#commentText").value="";
+      const commentsBox=$("#pane-comments .comments");
+      if(commentsBox)commentsBox.innerHTML=draft.comments.map(c=>`<div class="comment"><div class="comment-head"><strong>${esc(c.by)}</strong><small>${esc(c.at)}</small></div><p class="comment-body">${formatCommentText(c.text)}</p></div>`).join("");
+      const commentTab=$('.tab[data-tab="comments"] span');if(commentTab)commentTab.textContent=`Comments (${draft.comments.length})`;
+      toast("Comment added to draft — save the ticket to publish it");
     });
 
     if(existing){
@@ -717,7 +734,7 @@
         if(!ok) return;
         state.tickets = state.tickets.filter(t=>t.id!==ticketId);
         saveState();
-        close();
+        close(true);
         refreshDataViews();
         toast(`${ticketId} deleted`);
       });
@@ -730,7 +747,7 @@
         toast("Ticket title is required");
         return;
       }
-      const selectedCollabs = $$('input[name="collab"]:checked').map(x=>x.value);
+      const selectedCollabs = selectedCollaboratorInputs().map(x=>x.value);
       const links=$$(".link-row",$("#linkRows")).map(row=>({
         title:$(".doc-link-title",row).value.trim(),
         url:$(".doc-link-url",row).value.trim(),
@@ -779,7 +796,7 @@
         logActivity('create',updated,'Created ticket');
       }
       saveState();
-      close();
+      close(true);
       renderMemberSelects();
       renderBoard();
       toast(`${updated.id} ${existing?"updated":"created"} successfully`);
@@ -847,7 +864,7 @@
       $("#memberColorPreview").style.setProperty("--member-color",color);
       $("#memberColorPreview").textContent=initials(name);
     };
-    $("#closeModal").addEventListener("click",close);
+    $("#closeModal").addEventListener("click",()=>close(false));
     $("#cancelMember").addEventListener("click",close);
     $("#memberColor").addEventListener("input",updatePreview);
     $("#memberName").addEventListener("input",updatePreview);
