@@ -126,6 +126,7 @@
   let bulkMode = false;
   let bulkSelected = new Set();
   let selectedReleaseReadiness = "";
+  let workflowOrderDraft = null;
 
   let storageAvailable = true;
 
@@ -332,6 +333,7 @@
   async function loadRemoteWorkspace({quiet=false}={}){
     try{
       const data=await cloudRequest("/workspace");cloudApplyingRemote=true;state=normalizeCloudState(data.state);cloudApplyingRemote=false;
+      workflowOrderDraft=null;
       cloudVersion=Number(data.version||0);cloudLastStamp=data.updatedAt||"";cloudLastError="";
       const identityChanged=syncCurrentMemberToAuthenticatedUser();
       tfLog('info','Shared workflow order loaded',{version:cloudVersion,order:[...(state.workflowOrder||[])]});
@@ -346,6 +348,7 @@
     }catch(err){cloudApplyingRemote=false;cloudLastError=String(err?.message||err);tfLogError("Loading shared workspace failed",err,{quiet,cloudVersion});setSyncStatus("error","Sync · error",cloudLastError);if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your TeamFlow session expired. Sign in again.");}else if(!quiet)toast("Sync unavailable");return null;}
   }
   function serializableCloudState(){
+    // Only the last SAVED workflow order is serialized. The admin draft lives outside state.
     ensureSharedWorkflowOrder();
     const copy=clone(state);
     copy.settings=copy.settings&&typeof copy.settings==="object"?copy.settings:{};
@@ -902,13 +905,56 @@
     return true;
   }
 
-  async function moveSharedWorkflow(statusName,direction){
+  function currentWorkflowOrderDraft(){
+    const saved=ensureSharedWorkflowOrder().slice();
+    if(!Array.isArray(workflowOrderDraft)) workflowOrderDraft=saved.slice();
+    const allowed=new Set(saved);
+    workflowOrderDraft=workflowOrderDraft.filter(name=>allowed.has(name));
+    saved.forEach(name=>{if(!workflowOrderDraft.includes(name))workflowOrderDraft.push(name);});
+    return workflowOrderDraft;
+  }
+
+  function workflowOrderDraftChanged(){
+    if(!Array.isArray(workflowOrderDraft))return false;
+    const saved=ensureSharedWorkflowOrder();
+    return saved.length!==workflowOrderDraft.length || saved.some((name,index)=>name!==workflowOrderDraft[index]);
+  }
+
+  function moveWorkflowDraft(statusName,direction){
     if(cloudUser?.role!=="admin"){toast("Administrator access required");return false;}
-    const previous=ensureSharedWorkflowOrder().slice();const order=previous.slice();const index=order.indexOf(statusName);if(index<0)return false;
-    const nextIndex=direction==='up'?index-1:direction==='down'?index+1:index;if(nextIndex<0||nextIndex>=order.length||nextIndex===index)return false;
+    const order=currentWorkflowOrderDraft();
+    const index=order.indexOf(statusName);if(index<0)return false;
+    const nextIndex=direction==='up'?index-1:direction==='down'?index+1:index;
+    if(nextIndex<0||nextIndex>=order.length||nextIndex===index)return false;
     [order[index],order[nextIndex]]=[order[nextIndex],order[index]];
-    state.settings.workflowOrder=order.slice();state.workflowOrder=order.slice();state.statuses=order.slice();renderStatusEditor();renderBoard();
-    try{await persistSharedWorkflowOrder(order);return true;}catch(err){state.settings.workflowOrder=previous.slice();state.workflowOrder=previous.slice();state.statuses=previous.slice();tfLogError('Shared workflow order save failed',err,{status:statusName,direction,order});renderStatusEditor();renderBoard();toast('Workflow order could not be saved — see Console');return false;}
+    workflowOrderDraft=order.slice();
+    tfLog('info','Workflow order draft changed',{admin:cloudUser?.username||'',order:[...workflowOrderDraft]});
+    renderStatusEditor();
+    return true;
+  }
+
+  async function saveWorkflowOrderDraft(){
+    if(cloudUser?.role!=="admin"){toast("Administrator access required");return false;}
+    if(!workflowOrderDraftChanged()){workflowOrderDraft=null;renderStatusEditor();return true;}
+    const desired=currentWorkflowOrderDraft().slice();
+    const button=$("#saveWorkflowOrder");if(button){button.disabled=true;button.textContent="Saving…";}
+    try{
+      await persistSharedWorkflowOrder(desired);
+      workflowOrderDraft=null;
+      renderStatusEditor();renderBoard();renderOverview();renderInsights();renderTimeline();
+      toast("Workflow order saved for everyone");
+      return true;
+    }catch(err){
+      tfLogError('Shared workflow order save failed',err,{order:desired});
+      if(button){button.disabled=false;button.textContent="Save workflow order";}
+      toast("Workflow order could not be saved — see Console");
+      return false;
+    }
+  }
+
+  function discardWorkflowOrderDraft(){
+    workflowOrderDraft=null;
+    renderStatusEditor();
   }
 
   function ensureAdvancedState(){
@@ -1617,26 +1663,27 @@
   }
 
   function renderStatusEditor(){
-    const order=ensureSharedWorkflowOrder();
+    const savedOrder=ensureSharedWorkflowOrder();
     const isAdmin=cloudUser?.role==="admin";
+    const order=isAdmin?currentWorkflowOrderDraft():savedOrder;
+    const dirty=isAdmin&&workflowOrderDraftChanged();
     $("#statusEditor").innerHTML = order.map((statusName,i)=>{
       const count=state.tickets.filter(t=>t.status===statusName).length;
       const sharedIndex=state.statuses.indexOf(statusName);
       return `
       <div class="status-setting-row">
-        <div class="status-setting-main"><span class="settings-workflow-icon">${workflowIconSvg(workflowIconKey(statusName))}</span><div><strong>${esc(statusName)}</strong><small>${count} ticket${count===1?"":"s"} · ${esc(WORKFLOW_ICON_LIBRARY[workflowIconKey(statusName)]?.label||"General")} · Shared position ${i+1}</small></div></div>
+        <div class="status-setting-main"><span class="settings-workflow-icon">${workflowIconSvg(workflowIconKey(statusName))}</span><div><strong>${esc(statusName)}</strong><small>${count} ticket${count===1?"":"s"} · ${esc(WORKFLOW_ICON_LIBRARY[workflowIconKey(statusName)]?.label||"General")} · ${dirty?`Draft position ${i+1}`:`Saved position ${i+1}`}</small></div></div>
         <div class="work-order-actions">
-          ${isAdmin?`<button class="btn small" type="button" data-board-status-move="up" data-board-status="${esc(statusName)}" ${i===0?"disabled":""} title="Move workflow left for everyone">←</button>
-          <button class="btn small" type="button" data-board-status-move="down" data-board-status="${esc(statusName)}" ${i===order.length-1?"disabled":""} title="Move workflow right for everyone">→</button>`:'<span class="note">Admin controlled</span>'}
+          ${isAdmin?`<button class="btn small" type="button" data-board-status-move="up" data-board-status="${esc(statusName)}" ${i===0?"disabled":""} title="Move workflow left in draft">←</button>
+          <button class="btn small" type="button" data-board-status-move="down" data-board-status="${esc(statusName)}" ${i===order.length-1?"disabled":""} title="Move workflow right in draft">→</button>`:'<span class="note">Admin controlled</span>'}
           ${isAdmin?`<button class="btn small status-remove-btn" type="button" data-remove-status="${sharedIndex}" ${state.statuses.length<=1?"disabled":""}>Remove</button>`:''}
         </div>
       </div>`;
-    }).join("");
+    }).join("") + (isAdmin?`<div class="workflow-order-savebar" style="display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:14px 2px 2px;border-top:1px solid var(--border);margin-top:10px"><span class="note" style="margin-right:auto">${dirty?'Workflow order has unsaved changes. Other users still see the last saved order.':'Workflow order is saved and shared with everyone.'}</span>${dirty?'<button class="btn" id="discardWorkflowOrder" type="button">Discard</button><button class="btn primary" id="saveWorkflowOrder" type="button">Save workflow order</button>':''}</div>`:'');
 
-    $$('[data-board-status-move]').forEach(btn=>btn.addEventListener('click',async()=>{
-      const ok=await moveSharedWorkflow(btn.dataset.boardStatus,btn.dataset.boardStatusMove);
-      if(ok)toast(`${btn.dataset.boardStatus} moved for everyone`);
-    }));
+    $$('[data-board-status-move]').forEach(btn=>btn.addEventListener('click',()=>moveWorkflowDraft(btn.dataset.boardStatus,btn.dataset.boardStatusMove)));
+    $("#saveWorkflowOrder")?.addEventListener("click",saveWorkflowOrderDraft);
+    $("#discardWorkflowOrder")?.addEventListener("click",discardWorkflowOrderDraft);
     $$('[data-remove-status]').forEach(btn=>btn.addEventListener("click",()=>openRemoveWorkflowModal(Number(btn.dataset.removeStatus))));
     renderSettingsSummary();
   }
