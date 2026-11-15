@@ -2067,3 +2067,52 @@ html[data-theme="dark"] .ticket-editor-modal .editor-semantic-select{color:inher
 
 [data-theme="dark"] .detail-attachment-card,[data-theme="dark"] .detail-conversation-view .detail-comments-content,[data-theme="dark"] .detail-history-copy{background:var(--panel)}
 @media(max-width:760px){.detail-tab-hint{display:none}.detail-attachment-grid{grid-template-columns:1fr}.detail-attachment-card{grid-template-columns:38px minmax(0,1fr)}.detail-attachment-card-actions{grid-column:2;justify-content:flex-end}.detail-attachment-composer-head small{display:none}}
+
+
+/* === TeamFlow semantic status/priority visual alignment === */
+.detail-fact-pill[class*="semantic-status-"],
+.detail-status-control[class*="semantic-status-"],
+.detail-priority-large[class*="semantic-priority-"]{
+  border:1px solid transparent;
+  font-weight:900;
+}
+.detail-fact-pill.semantic-status-done,
+.detail-fact-pill.semantic-status-deployed-on-sit,
+.detail-status-control.semantic-status-done,
+.detail-status-control.semantic-status-deployed-on-sit{background:#e9f8ee;border-color:#79cf95;color:#126b34}
+.detail-fact-pill.semantic-status-ongoing,
+.detail-fact-pill.semantic-status-code-review,
+.detail-status-control.semantic-status-ongoing,
+.detail-status-control.semantic-status-code-review{background:#eaf4ff;border-color:#79b8ed;color:#135f9f}
+.detail-fact-pill.semantic-status-on-hold,
+.detail-status-control.semantic-status-on-hold{background:#fff3d8;border-color:#e7b84e;color:#8c5200}
+.detail-fact-pill.semantic-status-deprecated,
+.detail-status-control.semantic-status-deprecated{background:#eef0f4;border-color:#aab2c0;color:#4c586d}
+.detail-fact-pill.semantic-status-to-be-started,
+.detail-status-control.semantic-status-to-be-started{background:#f0eaff;border-color:#ae91ff;color:#6136d8}
+.detail-priority-large.semantic-priority-high{background:#ffebeb;border-color:#f08c8c;color:#b91f2b}
+.detail-priority-large.semantic-priority-medium{background:#fff0dc;border-color:#f0b56d;color:#b45200}
+.detail-priority-large.semantic-priority-low{background:#eaf8ef;border-color:#86cf9f;color:#1f703e}
+.detail-fact-pill.high{background:#ffebeb!important;border:1px solid #f08c8c!important;color:#b91f2b!important}
+.detail-fact-pill.medium{background:#fff0dc!important;border:1px solid #f0b56d!important;color:#b45200!important}
+.detail-fact-pill.low{background:#eaf8ef!important;border:1px solid #86cf9f!important;color:#1f703e!important}
+html[data-theme="dark"] .detail-fact-pill.semantic-status-done,
+html[data-theme="dark"] .detail-fact-pill.semantic-status-deployed-on-sit,
+html[data-theme="dark"] .detail-status-control.semantic-status-done,
+html[data-theme="dark"] .detail-status-control.semantic-status-deployed-on-sit{background:#173223;border-color:#285f3c;color:#72da91}
+html[data-theme="dark"] .detail-fact-pill.semantic-status-ongoing,
+html[data-theme="dark"] .detail-fact-pill.semantic-status-code-review,
+html[data-theme="dark"] .detail-status-control.semantic-status-ongoing,
+html[data-theme="dark"] .detail-status-control.semantic-status-code-review{background:#172e43;border-color:#28506f;color:#7bc8ff}
+html[data-theme="dark"] .detail-fact-pill.semantic-status-on-hold,
+html[data-theme="dark"] .detail-status-control.semantic-status-on-hold{background:#352817;border-color:#68491e;color:#ffc36a}
+html[data-theme="dark"] .detail-fact-pill.semantic-status-deprecated,
+html[data-theme="dark"] .detail-status-control.semantic-status-deprecated{background:#242933;border-color:#4a5363;color:#aeb8c8}
+html[data-theme="dark"] .detail-fact-pill.semantic-status-to-be-started,
+html[data-theme="dark"] .detail-status-control.semantic-status-to-be-started{background:#28203d;border-color:#514078;color:#bca8ff}
+html[data-theme="dark"] .detail-priority-large.semantic-priority-high,
+html[data-theme="dark"] .detail-fact-pill.high{background:#3a1d20!important;border-color:#713139!important;color:#ff9494!important}
+html[data-theme="dark"] .detail-priority-large.semantic-priority-medium,
+html[data-theme="dark"] .detail-fact-pill.medium{background:#352817!important;border-color:#68491e!important;color:#ffc36a!important}
+html[data-theme="dark"] .detail-priority-large.semantic-priority-low,
+html[data-theme="dark"] .detail-fact-pill.low{background:#173223!important;border-color:#285f3c!important;color:#72da91!important}

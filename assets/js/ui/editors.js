@@ -223,7 +223,6 @@
               <div class="editor-key-row"><label>${editorIcon('flag')}<span>Priority</span></label><select id="ticketPriority" class="editor-semantic-select semantic-priority-${semanticClass(ticket.priority)}">${["High","Medium","Low"].map(v=>`<option ${v===ticket.priority?"selected":""}>${v}</option>`).join("")}</select></div>
               <div class="editor-key-row"><label>${editorIcon('area')}<span>Area / ARCH / BE / FE</span></label><select id="ticketArea">${["ARCH","BE","FE","QA"].map(v=>`<option ${v===ticket.area?"selected":""}>${v}</option>`).join("")}</select></div>
               <div class="editor-key-row"><label>${editorIcon('alert')}<span>Risk / Delivery flag</span></label><select id="ticketRisk" class="editor-semantic-select semantic-risk-${semanticClass(ticket.risk||"None")}">${["None","At Risk","Blocked"].map(v=>`<option ${v===(ticket.risk||"None")?"selected":""}>${v}</option>`).join("")}</select></div>
-              <div class="editor-key-row"><label>${editorIcon('bolt')}<span>Sprint / Wave</span></label><input id="ticketSprint" value="${esc(ticket.sprint||"")}" placeholder="e.g. Wave 2" /></div>
               <div class="editor-key-row editor-key-row-progress"><label>${editorIcon('chart')}<span>Progress</span></label><div class="progress-editor editor-side-progress"><input id="ticketProgressRange" type="range" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" /><div class="progress-number"><input id="ticketProgress" type="number" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" /><span>%</span></div></div></div>
               <div class="editor-key-row"><label>${editorIcon('calendar')}<span>Start date</span></label><input id="ticketStart" type="date" value="${esc(ticket.start||"")}" /></div>
               <div class="editor-key-row"><label>${editorIcon('calendar')}<span>Expected end date</span></label><input id="ticketEnd" type="date" value="${esc(ticket.end||"")}" /></div>
@@ -335,15 +334,14 @@
               <div class="detail-eyebrow"><span class="ticket-id">${esc(t.id)}</span><span class="detail-type">${esc(t.type||"Task")}</span>${riskBlocked?'<span class="flag blocked">⛔ BLOCKED</span>':t.risk==="At Risk"?'<span class="flag risk">⚠ AT RISK</span>':''}</div>
               <div class="detail-title-line"><h2>${esc(t.title)}</h2></div>
               <div class="detail-status-row">
-                <span class="detail-status-control">${esc(t.status)}</span>
+                <span class="detail-status-control semantic-status-${semanticClass(t.status)}">${esc(t.status)}</span>
                 <span class="detail-status-sep"></span>
                 <span class="detail-status-meta">◆ ${esc(t.release||"No release")}</span>
                 <span class="detail-status-meta">${esc(t.area||"—")}</span>
-                <span class="detail-status-meta">${esc(t.sprint||"—")}</span>
               </div>
             </div>
             <div class="detail-hero-right">
-              <span class="detail-priority-large">${dIcons.flag}${esc(t.priority)}</span>
+              <span class="detail-priority-large semantic-priority-${semanticClass(t.priority)}">${dIcons.flag}${esc(t.priority)}</span>
               <div class="progress-orb" style="--progress-angle:${progress*3.6}deg"><div><strong>${progress}%</strong><small>Progress</small></div></div>
             </div>
           </div>
@@ -405,7 +403,7 @@
               <div class="detail-key-card">
                 <div class="detail-key-header">${dIcons.info}<span>Key details</span></div>
                 <div class="detail-facts">
-                  <div><small>Status</small><strong><span class="detail-fact-pill status">${esc(t.status)}</span></strong></div>
+                  <div><small>Status</small><strong><span class="detail-fact-pill semantic-status-${semanticClass(t.status)}">${esc(t.status)}</span></strong></div>
                   <div><small>Priority</small><strong><span class="detail-fact-pill ${String(t.priority).toLowerCase()}">${esc(t.priority)}</span></strong></div>
                   <div><small>Start date</small><strong>${formatDate(t.start)}</strong></div>
                   <div><small>Expected end</small><strong>${formatDate(t.end)}</strong></div>
@@ -790,7 +788,6 @@
         dependencies:$$('input[name="dependencyChoice"]:checked').map(o=>o.value),
         subtasks:$$('.subtask-row',$('#subtaskRows')).map((row,i)=>({id:(draft.subtasks?.[i]?.id)||('st'+Date.now()+i),text:$('.subtask-text',row).value.trim(),done:$('.subtask-done',row).checked})).filter(x=>x.text),
         autoProgress:$("#autoProgress").checked,
-        sprint:$("#ticketSprint").value.trim(),
         progress:normalizeProgress($("#ticketProgress").value),
         labels:$("#ticketLabels").value.split(",").map(x=>x.trim()).filter(Boolean),
         start:$("#ticketStart").value,
