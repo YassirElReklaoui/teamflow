@@ -156,7 +156,7 @@
         <span class="semantic-dot" aria-hidden="true"></span><span class="semantic-picker-value">${esc(value)}</span><span class="semantic-chevron">⌄</span>
       </button>
       <div class="semantic-picker-menu hidden" role="listbox">${values.map(v=>`<button class="semantic-picker-option semantic-${kind}-${semanticClass(v)} ${v===value?'selected':''}" type="button" role="option" aria-selected="${v===value?'true':'false'}" data-value="${esc(v)}"><span class="semantic-dot" aria-hidden="true"></span><span>${esc(v)}</span>${v===value?'<span class="semantic-check">✓</span>':''}</button>`).join("")}</div>
-      <select id="${esc(id)}" class="semantic-picker-native" tabindex="-1" aria-hidden="true">${values.map(v=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(v)}</option>`).join("")}</select>
+      <select id="${esc(id)}" class="semantic-picker-native" data-no-custom="1" tabindex="-1" aria-hidden="true">${values.map(v=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(v)}</option>`).join("")}</select>
     </div>`;
   }
 

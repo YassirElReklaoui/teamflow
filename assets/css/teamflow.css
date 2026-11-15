@@ -2153,3 +2153,32 @@ html[data-theme="dark"] .semantic-status-done,html[data-theme="dark"] .semantic-
 html[data-theme="dark"] .semantic-status-deprecated{color:#aeb8c8!important;background:#242933!important;border-color:#4a5363!important}
 html[data-theme="dark"] .semantic-priority-high,html[data-theme="dark"] .semantic-risk-blocked{color:#ff9494!important;background:#3a1d20!important;border-color:#713139!important}
 html[data-theme="dark"] .semantic-risk-none{color:var(--text)!important;background:var(--panel-2)!important;border-color:var(--border)!important}
+
+
+/* === TeamFlow semantic-picker duplicate guard === */
+.semantic-picker > .tf-select{display:none!important}
+.semantic-picker-native,
+.semantic-picker-native.tf-native-select{display:none!important;position:absolute!important;width:0!important;height:0!important;min-width:0!important;min-height:0!important;margin:0!important;padding:0!important;border:0!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important}
+
+/* === TeamFlow global slim scrollbars === */
+:root{
+  --tf-scrollbar-thumb:color-mix(in srgb,var(--accent) 48%,#a8b0c2);
+  --tf-scrollbar-thumb-hover:color-mix(in srgb,var(--accent) 70%,#7d879a);
+  --tf-scrollbar-track:transparent;
+}
+html[data-theme="dark"]{
+  --tf-scrollbar-thumb:color-mix(in srgb,var(--accent) 58%,#545f72);
+  --tf-scrollbar-thumb-hover:color-mix(in srgb,var(--accent) 78%,#7d879a);
+}
+html,body,*{
+  scrollbar-width:thin;
+  scrollbar-color:var(--tf-scrollbar-thumb) var(--tf-scrollbar-track);
+}
+*::-webkit-scrollbar{width:6px;height:6px}
+*::-webkit-scrollbar-track{background:var(--tf-scrollbar-track)}
+*::-webkit-scrollbar-thumb{background:var(--tf-scrollbar-thumb);border-radius:999px;border:1px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:var(--tf-scrollbar-thumb-hover);background-clip:padding-box}
+*::-webkit-scrollbar-corner{background:transparent}
+.modal-body,.detail-body,.editor-modal-body,.board-scroll,.sidebar,.notification-list,.semantic-picker-menu,.tf-select-menu-portal{
+  scrollbar-gutter:stable;
+}
