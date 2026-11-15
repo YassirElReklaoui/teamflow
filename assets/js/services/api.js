@@ -335,7 +335,13 @@
     if(!next.wipLimits||typeof next.wipLimits!=="object")next.wipLimits={};
     if(!next.statusIcons||typeof next.statusIcons!=="object"||Array.isArray(next.statusIcons))next.statusIcons={};
     if(!next.wipLimits||typeof next.wipLimits!=="object"||Array.isArray(next.wipLimits))next.wipLimits={};
+    // Current Worker returns shared workspace configuration as state.settings.
+    // Compatibility fallback: older Worker versions exposed these fields directly on state.
     if(!next.settings||typeof next.settings!=="object"||Array.isArray(next.settings))next.settings={};
+    if((typeof next.settings.workspaceName!=="string"||!next.settings.workspaceName.trim())&&typeof next.workspaceName==="string"&&next.workspaceName.trim())next.settings.workspaceName=next.workspaceName;
+    if((typeof next.settings.ticketPrefix!=="string"||!next.settings.ticketPrefix.trim())&&typeof next.ticketPrefix==="string"&&next.ticketPrefix.trim())next.settings.ticketPrefix=next.ticketPrefix;
+    if((next.settings.fallbackPollMinutes===undefined||next.settings.fallbackPollMinutes===null||next.settings.fallbackPollMinutes==="")&&next.fallbackPollMinutes!==undefined)next.settings.fallbackPollMinutes=next.fallbackPollMinutes;
+    delete next.workspaceName;delete next.ticketPrefix;delete next.fallbackPollMinutes;
     if(typeof next.settings.workspaceName!=="string"||!next.settings.workspaceName.trim())next.settings.workspaceName="Team Workspace";
     const normalizedPrefix=String(next.settings.ticketPrefix||"TASK").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,12);next.settings.ticketPrefix=normalizedPrefix.length>=2?normalizedPrefix:"TASK";
     const normalizedPoll=Number(next.settings.fallbackPollMinutes||5);next.settings.fallbackPollMinutes=[1,5,10,15].includes(normalizedPoll)?normalizedPoll:5;
