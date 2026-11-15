@@ -152,6 +152,10 @@
   let cloudVersion = 0;
   let cloudLastStamp = "";
   let cloudLastError = "";
+  let cloudBaselineState = null;
+  let deltaSaveTimer = null;
+  let deltaSaving = false;
+  let deltaDirty = false;
 
   function loadCloudConfig(){
     try{
@@ -399,57 +403,114 @@
       const data=await cloudRequest("/workspace");cloudApplyingRemote=true;state=normalizeCloudState(data.state);cloudApplyingRemote=false;
       workflowOrderDraft=null;
       cloudVersion=Number(data.version||0);cloudLastStamp=data.updatedAt||"";cloudLastError="";
-      const identityChanged=syncCurrentMemberToAuthenticatedUser();
+      syncCurrentMemberToAuthenticatedUser();
+      cloudBaselineState=clone(state);
       tfLog('info','Shared workflow order loaded',{version:cloudVersion,order:[...(state.workflowOrder||[])]});
       const globalSearch=document.getElementById("globalSearch");if(globalSearch)globalSearch.value="";
       activeDocId=state.documents.some(d=>d.id===activeDocId)?activeDocId:(state.documents[0]?.id||null);
       renderAfterSharedUpdate();
-      if(identityChanged&&cloudReady)scheduleRemoteSave();
+      tfLog('info','Workspace loaded read-only; no save scheduled',{user:cloudUser?.username||'',version:cloudVersion,currentMember:state.currentMember||''});
+      // IMPORTANT: loading/refreshing/syncing is read-only. Never PUT just because
+      // the signed-in user's local identity differs from shared workspace state.
       if(!quiet)toast("TeamFlow updated");
       setSyncStatus("updated","Sync · updated",`Version ${cloudVersion}${cloudLastStamp?` · ${new Date(cloudLastStamp).toLocaleTimeString()}`:""}`);
       setTimeout(()=>{if(!cloudSaving)setSyncStatus("connected","Sync · connected");},1200);
       return data;
     }catch(err){cloudApplyingRemote=false;cloudLastError=String(err?.message||err);tfLogError("Loading shared workspace failed",err,{quiet,cloudVersion});setSyncStatus("error","Sync · error",cloudLastError);if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your TeamFlow session expired. Sign in again.");}else if(!quiet)toast("Sync unavailable");return null;}
   }
-  function serializableCloudState(){
-    // Ordinary workspace sync MUST NEVER carry workflow configuration.
-    // Workflow order is saved only by the explicit admin endpoint in saveWorkflowOrderDraft().
-    const copy=clone(state);
-    if(copy.settings&&typeof copy.settings==="object"&&!Array.isArray(copy.settings)){
-      delete copy.settings.workflowOrder;
-      delete copy.settings.workflowRows;
-      delete copy.settings.workflows;
-      if(!Object.keys(copy.settings).length)delete copy.settings;
+  function jsonEqual(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+  function coreTicket(t){
+    const copy=clone(t||{});delete copy.comments;delete copy.subtasks;delete copy.links;delete copy.dependencies;delete copy.history;return copy;
+  }
+  function mapBy(items,keyFn){const m=new Map();(items||[]).forEach((v,i)=>m.set(String(keyFn(v,i)),v));return m;}
+  function changedFields(before,after,blocked=[]){
+    const out={},keys=new Set([...Object.keys(before||{}),...Object.keys(after||{})]);
+    keys.forEach(k=>{if(blocked.includes(k))return;if(!jsonEqual(before?.[k],after?.[k]))out[k]=after?.[k]});return out;
+  }
+  function linkKey(ticketId,link,index){return `${ticketId}__${link?.id||spHash(`${link?.url||''}|${link?.title||''}|${index}`)}`;}
+  function buildMinimalMutations(before,after){
+    const ops=[];
+    before=before||{};after=after||{};
+
+    const bt=mapBy(before.tickets,t=>t.id), at=mapBy(after.tickets,t=>t.id);
+    at.forEach((t,id)=>{
+      if(!bt.has(id)) ops.push({type:'ticket.create',id,value:coreTicket(t)});
+      else {const changes=changedFields(coreTicket(bt.get(id)),coreTicket(t),['id']);if(Object.keys(changes).length)ops.push({type:'ticket.patch',id,changes});}
+    });
+    bt.forEach((_,id)=>{if(!at.has(id))ops.push({type:'ticket.delete',id});});
+
+    function diffChildren(kind,prop,keyFn,wrap){
+      const b=new Map(),a=new Map();
+      (before.tickets||[]).forEach(t=>(t[prop]||[]).forEach((v,i)=>b.set(keyFn(t,v,i),wrap(t,v))));
+      (after.tickets||[]).forEach(t=>(t[prop]||[]).forEach((v,i)=>a.set(keyFn(t,v,i),wrap(t,v))));
+      a.forEach((v,id)=>{if(!b.has(id)||!jsonEqual(b.get(id),v))ops.push({type:`${kind}.upsert`,id,value:v});});
+      b.forEach((_,id)=>{if(!a.has(id))ops.push({type:`${kind}.delete`,id});});
     }
-    delete copy.workflowOrder;
-    delete copy.statuses;
-    delete copy.statusIcons;
-    delete copy.wipLimits;
-    copy.documents=(copy.documents||[]).filter(d=>d.kind!=="pdf-local").map(d=>{delete d.runtimeUrl;return d;});
-    return copy;
+    diffChildren('comment','comments',(t,c,i)=>`${t.id}__${c.id||spHash(JSON.stringify(c)+i)}`,(t,c)=>({ticketId:t.id,comment:c}));
+    diffChildren('checklist','subtasks',(t,s,i)=>`${t.id}__${s.id||spHash(JSON.stringify(s)+i)}`,(t,s)=>({ticketId:t.id,item:s}));
+    diffChildren('doclink','links',(t,l,i)=>linkKey(t.id,l,i),(t,l)=>({ticketId:t.id,link:l}));
+    diffChildren('dependency','dependencies',(t,d)=>`${t.id}__${d}`,(t,d)=>({ticketId:t.id,dependsOn:d}));
+
+    const bm=mapBy(before.members,m=>m.id||m.email||spHash(m.name||'')), am=mapBy(after.members,m=>m.id||m.email||spHash(m.name||''));
+    am.forEach((m,id)=>{if(!bm.has(id)||!jsonEqual(bm.get(id),m))ops.push({type:'member.upsert',id,value:m});});
+    bm.forEach((_,id)=>{if(!am.has(id))ops.push({type:'member.delete',id});});
+
+    const br=mapBy(before.releases,(r,i)=>typeof r==='string'?spHash(r):(r.id||spHash(r.name||String(i)))), ar=mapBy(after.releases,(r,i)=>typeof r==='string'?spHash(r):(r.id||spHash(r.name||String(i))));
+    ar.forEach((r,id)=>{const value=typeof r==='string'?{name:r,order:(after.releases||[]).indexOf(r)}:r;if(!br.has(id)||!jsonEqual(typeof br.get(id)==='string'?{name:br.get(id),order:(before.releases||[]).indexOf(br.get(id))}:br.get(id),value))ops.push({type:'release.upsert',id,value});});
+    br.forEach((_,id)=>{if(!ar.has(id))ops.push({type:'release.delete',id});});
+
+    const bd=mapBy((before.documents||[]).filter(d=>d.kind!=='pdf-local'),d=>d.id||spHash(d.name||'')), ad=mapBy((after.documents||[]).filter(d=>d.kind!=='pdf-local'),d=>d.id||spHash(d.name||''));
+    ad.forEach((d,id)=>{const value=clone(d);delete value.runtimeUrl;if(!bd.has(id)||!jsonEqual(bd.get(id),d))ops.push({type:'document.upsert',id,value});});
+    bd.forEach((_,id)=>{if(!ad.has(id))ops.push({type:'document.delete',id});});
+
+    const ba=mapBy(before.activity,a=>a.id), aa=mapBy(after.activity,a=>a.id);
+    aa.forEach((a,id)=>{if(id&&(!ba.has(id)||!jsonEqual(ba.get(id),a)))ops.push({type:'activity.upsert',id,value:a});});
+
+    // Workflow identity/icon/WIP may change only through admin UI actions.
+    // ORDER is intentionally excluded here and can only be sent by Save workflow order.
+    if(cloudUser?.role==='admin'){
+      const bs=new Set(before.statuses||[]),as=new Set(after.statuses||[]);
+      (after.statuses||[]).forEach(name=>{
+        const id=spHash(name),oldIcon=before.statusIcons?.[name]||'',newIcon=after.statusIcons?.[name]||'',oldWip=before.wipLimits?.[name]||'',newWip=after.wipLimits?.[name]||'';
+        if(!bs.has(name)||oldIcon!==newIcon||String(oldWip)!==String(newWip))ops.push({type:'workflow.upsert',id,value:{name,icon:newIcon,wip:newWip}});
+      });
+      (before.statuses||[]).forEach(name=>{if(!as.has(name))ops.push({type:'workflow.delete',id:spHash(name)});});
+    }
+
+    const userFields=['theme','favorites','recentTickets','savedViewsByMember','myWorkPrefsByMember','fontSizeByMember','timelinePrefs'];
+    const userChanges={};userFields.forEach(k=>{if(!jsonEqual(before?.[k],after?.[k]))userChanges[k]=clone(after?.[k]);});
+    if(Object.keys(userChanges).length)ops.push({type:'userState.patch',changes:userChanges});
+    return ops;
   }
-  async function saveRemoteWorkspace(){
-    if(!cloudReady||cloudApplyingRemote)return false;
-    if(cloudSaving){cloudDirty=true;return false;}
-    cloudSaving=true;cloudDirty=false;setSyncStatus("saving","Sync · saving…");
+
+  async function saveMinimalChanges(){
+    if(!cloudReady||cloudApplyingRemote||deltaSaving)return false;
+    const snapshot=clone(state);
+    const operations=buildMinimalMutations(cloudBaselineState||{},snapshot);
+    if(!operations.length){deltaDirty=false;return true;}
+    deltaSaving=true;deltaDirty=false;setSyncStatus('saving','Sync · saving…');
     try{
-      const outgoing=serializableCloudState();
-      tfLog('info','Ordinary workspace save - workflow configuration excluded',{user:cloudUser?.username||'',role:cloudUser?.role||'',version:cloudVersion,payloadKeys:Object.keys(outgoing)});
-      const result=await cloudRequest("/workspace",{method:"PUT",body:{version:cloudVersion,state:outgoing}});
-      cloudVersion=Number(result.version||cloudVersion+1);cloudLastStamp=result.updatedAt||new Date().toISOString();cloudLastError="";
-      setSyncStatus("saved","Sync · saved",`Version ${cloudVersion} · ${new Date(cloudLastStamp).toLocaleTimeString()}`);
-      setTimeout(()=>{if(!cloudSaving)setSyncStatus("connected","Sync · connected");},1200);return true;
+      tfLog('info','Sending minimal mutations',{count:operations.length,operations:operations.map(o=>({type:o.type,id:o.id,fields:o.changes?Object.keys(o.changes):undefined}))});
+      const result=await cloudRequest('/mutations',{method:'POST',body:{operations}});
+      cloudVersion=Number(result.version||cloudVersion);cloudLastStamp=result.updatedAt||new Date().toISOString();cloudLastError='';
+      cloudBaselineState=snapshot;
+      setSyncStatus('saved','Sync · saved',`Version ${cloudVersion} · ${operations.length} change${operations.length===1?'':'s'}`);
+      setTimeout(()=>{if(!deltaSaving)setSyncStatus('connected','Sync · connected');},900);
+      return true;
     }catch(err){
-      cloudLastError=String(err?.message||err);
-      if(err.status===409){setSyncStatus("error","Sync · newer data found","Another user saved first. TeamFlow is reloading the latest shared version to prevent an overwrite.");toast("Newer shared changes found — reloading");await loadRemoteWorkspace({quiet:true});}
-      else if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your session expired. Sign in again.");}
-      else{tfLogError("Saving shared workspace failed",err,{cloudVersion});setSyncStatus("error","Sync · save failed",cloudLastError);toast("Could not save shared changes");}
+      cloudLastError=String(err?.message||err);tfLogError('Minimal mutation save failed',err,{operations});
+      if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate('Your session expired. Sign in again.');}
+      else{setSyncStatus('error','Sync · save failed',cloudLastError);toast('Could not save changes — see Console');}
       return false;
-    }finally{cloudSaving=false;if(cloudDirty&&cloudReady){cloudDirty=false;scheduleRemoteSave();}}
+    }finally{deltaSaving=false;if(deltaDirty&&cloudReady){deltaDirty=false;scheduleRemoteSave();}}
   }
-  function scheduleRemoteSave(){if(!cloudReady||cloudApplyingRemote)return;cloudDirty=true;clearTimeout(cloudSaveTimer);cloudSaveTimer=setTimeout(()=>saveRemoteWorkspace(),700);}
+  function saveRemoteWorkspace(){return saveMinimalChanges();}
+  function scheduleRemoteSave(){
+    if(!cloudReady||cloudApplyingRemote)return;
+    deltaDirty=true;clearTimeout(deltaSaveTimer);deltaSaveTimer=setTimeout(()=>saveMinimalChanges(),450);
+  }
   async function pollCloud(){
-    if(document.hidden||cloudSaving||cloudApplyingRemote||cloudDirty||!cloudReady)return;
+    if(document.hidden||deltaSaving||cloudApplyingRemote||deltaDirty||!cloudReady)return;
     try{const info=await cloudRequest(`/changes?since=${encodeURIComponent(cloudVersion)}`);if(info.changed)await loadRemoteWorkspace({quiet:true});}
     catch(err){cloudLastError=String(err?.message||err);tfLogError("Cloud polling failed",err,{cloudVersion});if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your session expired. Sign in again.");}else setSyncStatus("error","Sync · error",cloudLastError);}
   }
@@ -951,24 +1012,17 @@
 
   async function persistSharedWorkflowOrder(order){
     if(cloudUser?.role!=="admin")throw new Error("Administrator access required");
-    const desired=order.map(x=>String(x||"").trim()).filter(Boolean);
-    if(!desired.length)throw new Error("Workflow order cannot be empty");
-    tfLog('info','Admin workflow order save requested',{admin:cloudUser?.username||'',order:desired});
-    if(!cloudReady){
-      state.settings=state.settings&&typeof state.settings==='object'&&!Array.isArray(state.settings)?state.settings:{};
-      state.settings.workflowOrder=desired.slice();
-      state.workflowOrder=desired.slice();
-      return true;
-    }
-    // Dedicated admin-only API. This request sends ONLY the order, never workspace/tickets/members.
+    const desired=order.slice();
+    if(!cloudReady)throw new Error("TeamFlow must be connected to save workflow order");
+    tfLog('info','Saving workflow order through dedicated admin endpoint',{admin:cloudUser?.username||'',order:desired});
     const result=await cloudRequest('/admin/workflows/order',{method:'PUT',body:{order:desired}});
-    if(result?.version!==undefined)cloudVersion=Number(result.version||cloudVersion);
-    cloudLastStamp=result?.updatedAt||new Date().toISOString();
-    state.settings=state.settings&&typeof state.settings==='object'&&!Array.isArray(state.settings)?state.settings:{};
-    state.settings.workflowOrder=desired.slice();
+    cloudVersion=Number(result.version||cloudVersion);cloudLastStamp=result.updatedAt||new Date().toISOString();
+    state.statuses=desired.slice();
     state.workflowOrder=desired.slice();
-    tfLog('info','Admin workflow order saved',{version:cloudVersion,order:desired,payload:{order:desired}});
-    setSyncStatus('saved','Sync · saved',`Workflow order${cloudVersion?` · version ${cloudVersion}`:''}`);
+    if(state.settings&&typeof state.settings==='object'&&!Array.isArray(state.settings))state.settings.workflowOrder=desired.slice();
+    cloudBaselineState=clone(state);
+    tfLog('info','Workflow order saved',{version:cloudVersion,order:desired});
+    setSyncStatus('saved','Sync · saved',`Workflow order · version ${cloudVersion}`);
     return true;
   }
 
