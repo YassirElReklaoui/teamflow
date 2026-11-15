@@ -4,8 +4,8 @@
   function loadCloudConfig(){
     try{
       const saved=JSON.parse(localStorage.getItem(CLOUD_CONFIG_KEY)||"null")||{};
-      return {...TEAMFLOW_CLOUD_DEFAULTS,...saved};
-    }catch(_){return {...TEAMFLOW_CLOUD_DEFAULTS};}
+      return {...TEAMFLOW_CLOUD_DEFAULTS,...saved,pollMs:300000};
+    }catch(_){return {...TEAMFLOW_CLOUD_DEFAULTS,pollMs:300000};}
   }
   function saveCloudConfig(){
     try{localStorage.setItem(CLOUD_CONFIG_KEY,JSON.stringify(cloudConfig));}catch(_){}
@@ -482,7 +482,7 @@
       const loaded=await loadRemoteWorkspace({quiet:true});if(!loaded)throw new Error(cloudLastError||"Could not load workspace");
       if(cloudUser?.role==="admin")await loadBackups({quiet:true});
       setSyncStatus("connected","Sync · connected",`Signed in as ${cloudUser.displayName||cloudUser.username}`);
-      clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,Number(cloudConfig.pollMs||300000));
+      clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,300000);
       updateCloudSettingsCard();
       window.teamFlowNotificationsOnConnected?.();
     }catch(err){
