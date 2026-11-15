@@ -955,31 +955,88 @@
   }
 
 
+  function savedWorkflowRecordsFromState(){
+    const candidates=[
+      state.settings?.workflowRows,
+      state.settings?.workflows,
+      state.workflowRows,
+      state.workflowSettings,
+      state.settingsRows,
+      state.workflows
+    ];
+    for(const source of candidates){
+      if(!Array.isArray(source)||!source.length)continue;
+      const records=source.map((entry,index)=>parseWorkflowSettingRecord(entry,index)).filter(Boolean);
+      if(!records.length||!records.some(record=>record.hasExplicitOrder))continue;
+      records.sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name));
+      return records;
+    }
+    return [];
+  }
+
   function ensureSharedWorkflowOrder(){
-    if(!state.settings||typeof state.settings!=="object"||Array.isArray(state.settings))state.settings={};
-    const identities=Array.isArray(state.statuses)&&state.statuses.length?state.statuses.slice():clone(DEFAULT_STATUSES);
-    let order=Array.isArray(state.settings.workflowOrder)&&state.settings.workflowOrder.length?state.settings.workflowOrder.slice():(Array.isArray(state.workflowOrder)&&state.workflowOrder.length?state.workflowOrder.slice():identities.slice());
-    const identityByLower=new Map(identities.map(name=>[String(name).toLowerCase(),String(name)]));
-    const seen=new Set();
-    order=order.map(name=>identityByLower.get(String(name).toLowerCase())).filter(name=>{if(!name)return false;const k=name.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
-    identities.forEach(name=>{const k=String(name).toLowerCase();if(!seen.has(k)){order.push(String(name));seen.add(k);}});
-    state.settings.workflowOrder=order.slice();
-    state.workflowOrder=order.slice();
-    state.statuses=order.slice();
-    return order.slice();
+    // READ-ONLY order resolver. Rendering must never mutate shared workflow state.
+    const recordOrder=savedWorkflowRecordsFromState().map(record=>record.name);
+    const identitiesRaw=Array.isArray(state.statuses)&&state.statuses.length?state.statuses.slice():clone(DEFAULT_STATUSES);
+    const identities=[];const identitySeen=new Set();
+    [...recordOrder,...identitiesRaw].forEach(value=>{const name=String(value||"").trim();const key=name.toLowerCase();if(name&&!identitySeen.has(key)){identitySeen.add(key);identities.push(name);}});
+    const configured=recordOrder.length?recordOrder:(Array.isArray(state.settings?.workflowOrder)&&state.settings.workflowOrder.length?state.settings.workflowOrder.slice():(Array.isArray(state.workflowOrder)&&state.workflowOrder.length?state.workflowOrder.slice():identities.slice()));
+    const byLower=new Map(identities.map(name=>[name.toLowerCase(),name]));
+    const order=[];const seen=new Set();
+    configured.forEach(value=>{const name=byLower.get(String(value||"").trim().toLowerCase());if(name&&!seen.has(name.toLowerCase())){seen.add(name.toLowerCase());order.push(name);}});
+    identities.forEach(name=>{if(!seen.has(name.toLowerCase())){seen.add(name.toLowerCase());order.push(name);}});
+    return order;
+  }
+
+  function updateWorkflowRowsWithOrder(rows,desired){
+    if(!Array.isArray(rows))return rows;
+    const orderMap=new Map(desired.map((name,index)=>[String(name).toLowerCase(),index]));
+    return rows.map((entry,index)=>{
+      const parsed=parseWorkflowSettingRecord(entry,index);
+      if(!parsed)return entry;
+      const nextOrder=orderMap.get(parsed.name.toLowerCase());
+      if(nextOrder===undefined)return entry;
+      const patchValue=value=>{
+        let obj=value;
+        let stringified=false;
+        if(typeof obj==='string'){
+          try{obj=JSON.parse(obj);stringified=true;}catch(_){return value;}
+        }else obj=clone(obj);
+        if(!obj||typeof obj!=='object'||Array.isArray(obj))return value;
+        obj.order=nextOrder;
+        return stringified?JSON.stringify(obj):obj;
+      };
+      if(entry&&typeof entry==='object'&&!Array.isArray(entry)&&Object.prototype.hasOwnProperty.call(entry,'json')){
+        const copy=clone(entry);copy.json=patchValue(copy.json);return copy;
+      }
+      return patchValue(entry);
+    });
+  }
+
+  function applyWorkflowOrderToAllRows(target,desired){
+    if(!target||typeof target!=="object")return;
+    if(target.settings&&typeof target.settings==='object'&&!Array.isArray(target.settings)){
+      if(Array.isArray(target.settings.workflowRows))target.settings.workflowRows=updateWorkflowRowsWithOrder(target.settings.workflowRows,desired);
+      if(Array.isArray(target.settings.workflows))target.settings.workflows=updateWorkflowRowsWithOrder(target.settings.workflows,desired);
+    }
+    ['workflowRows','workflowSettings','settingsRows','workflows'].forEach(key=>{if(Array.isArray(target[key]))target[key]=updateWorkflowRowsWithOrder(target[key],desired);});
   }
 
   async function persistSharedWorkflowOrder(order){
     if(cloudUser?.role!=="admin")throw new Error("Administrator access required");
     const desired=order.slice();
-    if(!cloudReady){state.settings=state.settings||{};state.settings.workflowOrder=desired.slice();state.workflowOrder=desired.slice();state.statuses=desired.slice();saveState();return true;}
+    if(!cloudReady){state.settings=state.settings||{};state.settings.workflowOrder=desired.slice();state.workflowOrder=desired.slice();applyWorkflowOrderToAllRows(state,desired);saveState();return true;}
     tfLog('info','Persisting shared workflow order',{admin:cloudUser?.username||'',order:desired});
     const latest=await cloudRequest('/workspace');
     const remote=normalizeCloudState(latest.state);
-    remote.settings=remote.settings||{};remote.settings.workflowOrder=desired.slice();remote.workflowOrder=desired.slice();remote.statuses=desired.slice();
+    remote.settings=remote.settings||{};
+    remote.settings.workflowOrder=desired.slice();
+    remote.workflowOrder=desired.slice();
+    // Do not derive identity from position. Keep the same workflow names and only persist numeric positions.
+    applyWorkflowOrderToAllRows(remote,desired);
     const result=await cloudRequest('/workspace',{method:'PUT',body:{version:Number(latest.version||0),state:remote}});
     cloudVersion=Number(result.version||Number(latest.version||0)+1);cloudLastStamp=result.updatedAt||new Date().toISOString();
-    state.settings=state.settings||{};state.settings.workflowOrder=desired.slice();state.workflowOrder=desired.slice();state.statuses=desired.slice();
+    state.settings=state.settings||{};state.settings.workflowOrder=desired.slice();state.workflowOrder=desired.slice();applyWorkflowOrderToAllRows(state,desired);
     tfLog('info','Shared workflow order persisted',{version:cloudVersion,order:desired});
     setSyncStatus('saved','Sync · saved',`Workflow order · version ${cloudVersion}`);
     return true;
@@ -1742,26 +1799,80 @@
     $$('[data-edit-member]').forEach(btn=>btn.addEventListener('click',()=>{const member=state.members.find(m=>m.id===btn.dataset.editMember);if(!member)return;if(isAdmin)openMemberModal(member.id);else if(linkedSelf?.id===member.id)openPersonalProfileModal();else openMemberModal(member.id,{readOnly:true});}));
   }
 
+  function ensureWorkflowEditorStyles(){
+    if(document.getElementById('teamflowWorkflowEditorStyles'))return;
+    const style=document.createElement('style');
+    style.id='teamflowWorkflowEditorStyles';
+    style.textContent=`
+      #statusEditor.workflow-order-editor{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:12px;align-items:stretch}
+      #statusEditor .status-setting-row.workflow-sort-card{position:relative;display:flex;align-items:center;gap:12px;min-height:92px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--panel,#fff);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease,opacity .16s ease;cursor:default}
+      #statusEditor .status-setting-row.workflow-sort-card[draggable="true"]{cursor:grab}
+      #statusEditor .status-setting-row.workflow-sort-card.workflow-dragging{opacity:.42;transform:scale(.985)}
+      #statusEditor .status-setting-row.workflow-sort-card.workflow-drop-before{box-shadow:-5px 0 0 var(--accent);border-color:color-mix(in srgb,var(--accent) 38%,var(--border))}
+      #statusEditor .status-setting-row.workflow-sort-card.workflow-drop-after{box-shadow:5px 0 0 var(--accent);border-color:color-mix(in srgb,var(--accent) 38%,var(--border))}
+      #statusEditor .workflow-drag-handle{width:28px;height:36px;display:grid;place-items:center;border-radius:9px;background:var(--soft);color:var(--accent);font-weight:900;letter-spacing:-2px;flex:0 0 auto;user-select:none}
+      #statusEditor .workflow-position-badge{position:absolute;top:8px;right:8px;display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 7px;border-radius:999px;background:var(--soft);color:var(--accent);font-size:11px;font-weight:900}
+      #statusEditor .status-setting-main{min-width:0;flex:1}
+      #statusEditor .status-setting-main>div{min-width:0}
+      #statusEditor .status-setting-main strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:28px}
+      #statusEditor .status-setting-main small{display:block;margin-top:4px;line-height:1.35;color:var(--muted)}
+      #statusEditor .work-order-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+      #statusEditor .workflow-order-savebar{grid-column:1/-1;display:flex;align-items:center;gap:12px;padding:12px 14px;margin-top:2px;border:1px solid var(--border);border-radius:14px;background:linear-gradient(180deg,var(--panel,#fff),var(--panel2,#f8f9fc));box-shadow:0 5px 16px rgba(31,39,70,.05)}
+      #statusEditor .workflow-order-savecopy{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+      #statusEditor .workflow-order-savecopy .dot{width:9px;height:9px;border-radius:50%;background:var(--success,#16a34a);box-shadow:0 0 0 4px rgba(22,163,74,.10)}
+      #statusEditor .workflow-order-savebar.dirty .workflow-order-savecopy .dot{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.12)}
+      #statusEditor .workflow-order-savecopy strong{font-size:12px}
+      #statusEditor .workflow-order-savecopy small{display:block;margin-top:2px;color:var(--muted);font-size:11px}
+      #statusEditor .workflow-order-saveactions{display:flex;gap:8px;flex:0 0 auto}
+      #statusEditor .workflow-order-saveactions .btn{min-width:94px}
+      @media(max-width:760px){#statusEditor.workflow-order-editor{grid-template-columns:1fr}#statusEditor .workflow-order-savebar{align-items:stretch;flex-direction:column}#statusEditor .workflow-order-saveactions{width:100%}#statusEditor .workflow-order-saveactions .btn{flex:1}}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function moveWorkflowDraftByDrop(fromName,toName,after){
+    if(cloudUser?.role!=="admin")return;
+    const order=currentWorkflowOrderDraft().slice();
+    if(!fromName||!toName||fromName===toName)return;
+    const fromIndex=order.indexOf(fromName);if(fromIndex<0)return;
+    order.splice(fromIndex,1);
+    let targetIndex=order.indexOf(toName);if(targetIndex<0)return;
+    if(after)targetIndex++;
+    order.splice(targetIndex,0,fromName);
+    workflowOrderDraft=order;
+    tfLog('info','Workflow order draft changed by drag',{admin:cloudUser?.username||'',order:[...order]});
+    renderStatusEditor();
+  }
+
   function renderStatusEditor(){
+    ensureWorkflowEditorStyles();
     const savedOrder=ensureSharedWorkflowOrder();
     const isAdmin=cloudUser?.role==="admin";
-    const order=isAdmin?currentWorkflowOrderDraft():savedOrder;
+    const order=isAdmin?currentWorkflowOrderDraft():savedOrder.slice();
     const dirty=isAdmin&&workflowOrderDraftChanged();
-    $("#statusEditor").innerHTML = order.map((statusName,i)=>{
+    const editor=$("#statusEditor");
+    editor.classList.add('workflow-order-editor');
+    editor.innerHTML = order.map((statusName,i)=>{
       const count=state.tickets.filter(t=>t.status===statusName).length;
-      const sharedIndex=state.statuses.indexOf(statusName);
+      const sharedIndex=state.statuses.findIndex(s=>String(s).toLowerCase()===String(statusName).toLowerCase());
       return `
-      <div class="status-setting-row">
+      <div class="status-setting-row workflow-sort-card" data-workflow-card="${esc(statusName)}" ${isAdmin?'draggable="true"':''}>
+        ${isAdmin?'<span class="workflow-drag-handle" title="Drag to reorder">⋮⋮</span>':''}
         <div class="status-setting-main"><span class="settings-workflow-icon">${workflowIconSvg(workflowIconKey(statusName))}</span><div><strong>${esc(statusName)}</strong><small>${count} ticket${count===1?"":"s"} · ${esc(WORKFLOW_ICON_LIBRARY[workflowIconKey(statusName)]?.label||"General")} · ${dirty?`Draft position ${i+1}`:`Saved position ${i+1}`}</small></div></div>
-        <div class="work-order-actions">
-          ${isAdmin?`<button class="btn small" type="button" data-board-status-move="up" data-board-status="${esc(statusName)}" ${i===0?"disabled":""} title="Move workflow left in draft">←</button>
-          <button class="btn small" type="button" data-board-status-move="down" data-board-status="${esc(statusName)}" ${i===order.length-1?"disabled":""} title="Move workflow right in draft">→</button>`:'<span class="note">Admin controlled</span>'}
-          ${isAdmin?`<button class="btn small status-remove-btn" type="button" data-remove-status="${sharedIndex}" ${state.statuses.length<=1?"disabled":""}>Remove</button>`:''}
-        </div>
+        <span class="workflow-position-badge">${i+1}</span>
+        <div class="work-order-actions">${!isAdmin?'<span class="note">Admin controlled</span>':''}${isAdmin?`<button class="btn small status-remove-btn" type="button" data-remove-status="${sharedIndex}" ${state.statuses.length<=1?"disabled":""}>Remove</button>`:''}</div>
       </div>`;
-    }).join("") + (isAdmin?`<div class="workflow-order-savebar" style="display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:14px 2px 2px;border-top:1px solid var(--border);margin-top:10px"><span class="note" style="margin-right:auto">${dirty?'Workflow order has unsaved changes. Other users still see the last saved order.':'Workflow order is saved and shared with everyone.'}</span>${dirty?'<button class="btn" id="discardWorkflowOrder" type="button">Discard</button><button class="btn primary" id="saveWorkflowOrder" type="button">Save workflow order</button>':''}</div>`:'');
+    }).join("") + (isAdmin?`<div class="workflow-order-savebar ${dirty?'dirty':''}"><div class="workflow-order-savecopy"><span class="dot"></span><div><strong>${dirty?'Unsaved workflow order':'Workflow order saved'}</strong><small>${dirty?'Drag cards into the required positions, then save. Board and other users still use the last saved order.':'Board and all users use this saved numeric order.'}</small></div></div><div class="workflow-order-saveactions">${dirty?'<button class="btn" id="discardWorkflowOrder" type="button">Discard changes</button><button class="btn primary" id="saveWorkflowOrder" type="button">Save order</button>':''}</div></div>`:'');
 
-    $$('[data-board-status-move]').forEach(btn=>btn.addEventListener('click',()=>moveWorkflowDraft(btn.dataset.boardStatus,btn.dataset.boardStatusMove)));
+    if(isAdmin){
+      $$('[data-workflow-card]',editor).forEach(card=>{
+        card.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/teamflow-workflow-order',card.dataset.workflowCard);e.dataTransfer.effectAllowed='move';card.classList.add('workflow-dragging');});
+        card.addEventListener('dragend',()=>{$$('[data-workflow-card]',editor).forEach(x=>x.classList.remove('workflow-dragging','workflow-drop-before','workflow-drop-after'));});
+        card.addEventListener('dragover',e=>{if(!e.dataTransfer.types.includes('text/teamflow-workflow-order'))return;e.preventDefault();const rect=card.getBoundingClientRect();const after=e.clientX>rect.left+rect.width/2;card.classList.toggle('workflow-drop-before',!after);card.classList.toggle('workflow-drop-after',after);});
+        card.addEventListener('dragleave',()=>card.classList.remove('workflow-drop-before','workflow-drop-after'));
+        card.addEventListener('drop',e=>{e.preventDefault();const from=e.dataTransfer.getData('text/teamflow-workflow-order');const rect=card.getBoundingClientRect();const after=e.clientX>rect.left+rect.width/2;card.classList.remove('workflow-drop-before','workflow-drop-after');moveWorkflowDraftByDrop(from,card.dataset.workflowCard,after);});
+      });
+    }
     $("#saveWorkflowOrder")?.addEventListener("click",saveWorkflowOrderDraft);
     $("#discardWorkflowOrder")?.addEventListener("click",discardWorkflowOrderDraft);
     $$('[data-remove-status]').forEach(btn=>btn.addEventListener("click",()=>openRemoveWorkflowModal(Number(btn.dataset.removeStatus))));
