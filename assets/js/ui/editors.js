@@ -77,6 +77,21 @@
     `).join("");
   }
 
+  function collaboratorPickerHtml(selected){
+    const set=new Set(selected||[]);
+    const selectedMembers=state.members.filter(m=>set.has(m.name));
+    return `<div class="editor-collab-picker" id="editorCollabPicker">
+      <button class="editor-collab-trigger" id="editorCollabTrigger" type="button" aria-expanded="false">
+        <span class="editor-collab-trigger-copy"><small>Team members</small><strong id="editorCollabSummary">${selectedMembers.length?`${selectedMembers.length} selected`:'Select collaborators…'}</strong></span><span class="editor-collab-chevron">⌄</span>
+      </button>
+      <div class="editor-collab-menu hidden" id="editorCollabMenu">
+        <div class="editor-collab-search-wrap"><input id="editorCollabSearch" type="search" placeholder="Search team members…" autocomplete="off" /></div>
+        <div class="editor-collab-options">${state.members.map(m=>`<label class="editor-collab-option" data-collab-search="${esc(String(m.name||'').toLowerCase())}"><input type="checkbox" name="collab" value="${esc(m.name)}" ${set.has(m.name)?'checked':''}/><span class="editor-collab-avatar" style="--member-color:${esc(m.color||memberColor(m.name))}">${esc(initials(m.name))}</span><span class="editor-collab-option-copy"><strong>${esc(m.name)}</strong><small>${esc(m.role||'Team member')}</small></span><span class="editor-collab-check">✓</span></label>`).join('')}</div>
+      </div>
+      <div class="editor-collab-selected" id="editorCollabSelected">${selectedMembers.length?selectedMembers.map(m=>`<span class="editor-selected-person" style="--member-color:${esc(m.color||memberColor(m.name))}"><span>${esc(initials(m.name))}</span><strong>${esc(m.name)}</strong></span>`).join(''):'<span class="note">No collaborators selected</span>'}</div>
+    </div>`;
+  }
+
   function linkRowsHtml(links){
     const rows=(links&&links.length?links:[{title:"",url:"",chapter:""}]);
     return rows.map(l=>`<div class="link-row">
@@ -135,6 +150,7 @@
   function ticketForm(ticket){
     const otherTickets=state.tickets.filter(t=>t.id!==ticket.id);
     const assigneeMember=state.members.find(m=>m.name===ticket.assignee);
+    const selfMember=linkedMemberForCurrentUser();
     const assigneeInitials=initials(ticket.assignee||"Unassigned");
     const assigneeColor=assigneeMember?.color||memberColor(ticket.assignee||"Unassigned");
     const semanticClass=value=>String(value||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
@@ -196,7 +212,7 @@
             <div class="editor-side-heading">${editorIcon('user')}<strong>Assigned to</strong></div>
             <div class="editor-assignee-control" style="--editor-member-color:${esc(assigneeColor)}">
               <span class="editor-assignee-avatar" id="ticketAssigneeAvatar">${esc(assigneeInitials)}</span>
-              <div class="editor-assignee-copy"><small>Owner</small><select id="ticketAssignee">${state.members.length?state.members.map(m=>`<option ${m.name===ticket.assignee?"selected":""}>${esc(m.name)}</option>`).join(""):`<option value="">Unassigned</option>`}</select></div>
+              <div class="editor-assignee-copy"><div class="editor-assignee-label-row"><small>Owner</small>${selfMember?`<button id="assignTicketToMe" class="editor-assign-me" type="button">Assign to me</button>`:''}</div><select id="ticketAssignee">${state.members.length?state.members.map(m=>`<option ${m.name===ticket.assignee?"selected":""}>${esc(m.name)}</option>`).join(""):`<option value="">Unassigned</option>`}</select></div>
             </div>
           </section>
 
@@ -225,8 +241,8 @@
           </section>
 
           <section class="editor-side-card editor-collaborator-card">
-            <div class="editor-side-heading">${editorIcon('users')}<strong>Collaborators</strong><span class="editor-side-count">${(ticket.collaborators||[]).length}</span></div>
-            <div class="check-grid editor-collab-grid">${collaboratorChecks(ticket.collaborators)}</div>
+            <div class="editor-side-heading">${editorIcon('users')}<strong>Collaborators</strong><span class="editor-side-count" id="editorCollabCount">${(ticket.collaborators||[]).length}</span></div>
+            ${collaboratorPickerHtml(ticket.collaborators)}
           </section>
         </aside>
       </div>
@@ -532,8 +548,10 @@
     `;
 
     let dependencyOutsideHandler=null;
+    let collaboratorOutsideHandler=null;
     const close = ()=>{
       if(dependencyOutsideHandler) document.removeEventListener("pointerdown",dependencyOutsideHandler,true);
+      if(collaboratorOutsideHandler) document.removeEventListener("pointerdown",collaboratorOutsideHandler,true);
       $("#modalRoot").innerHTML="";
     };
     $("#closeModal").addEventListener("click",close);
@@ -604,12 +622,31 @@
     riskSelect?.addEventListener("change",()=>refreshSemanticSelect(riskSelect,"semantic-risk-"));
     const assigneeSelect=$("#ticketAssignee"),assigneeAvatar=$("#ticketAssigneeAvatar");
     assigneeSelect?.addEventListener("change",()=>{const member=state.members.find(m=>m.name===assigneeSelect.value);const wrap=assigneeSelect.closest(".editor-assignee-control");if(assigneeAvatar)assigneeAvatar.textContent=initials(assigneeSelect.value||"Unassigned");if(wrap)wrap.style.setProperty("--editor-member-color",member?.color||memberColor(assigneeSelect.value||"Unassigned"));});
+    $("#assignTicketToMe")?.addEventListener("click",()=>{const self=linkedMemberForCurrentUser();if(!self||!assigneeSelect)return;assigneeSelect.value=self.name;assigneeSelect.dispatchEvent(new Event("change",{bubbles:true}));toast(`Assigned to ${self.name}`);});
+
+    const collabPicker=$("#editorCollabPicker"),collabTrigger=$("#editorCollabTrigger"),collabMenu=$("#editorCollabMenu"),collabSearch=$("#editorCollabSearch");
+    const refreshCollaboratorSummary=()=>{
+      if(!collabPicker)return;const selected=$$('input[name="collab"]:checked',collabPicker);
+      const count=$("#editorCollabCount");if(count)count.textContent=String(selected.length);
+      const summary=$("#editorCollabSummary");if(summary)summary.textContent=selected.length?`${selected.length} selected`:'Select collaborators…';
+      const box=$("#editorCollabSelected");if(box)box.innerHTML=selected.length?selected.map(input=>{const m=state.members.find(x=>x.name===input.value);return `<span class="editor-selected-person" style="--member-color:${esc(m?.color||memberColor(input.value))}"><span>${esc(initials(input.value))}</span><strong>${esc(input.value)}</strong></span>`;}).join(''):'<span class="note">No collaborators selected</span>';
+    };
+    const closeCollaboratorMenu=()=>{collabMenu?.classList.add("hidden");collabTrigger?.setAttribute("aria-expanded","false");};
+    if(collabPicker&&collabTrigger&&collabMenu){
+      collabTrigger.addEventListener("click",()=>{const opening=collabMenu.classList.contains("hidden");if(opening){collabMenu.classList.remove("hidden");collabTrigger.setAttribute("aria-expanded","true");setTimeout(()=>collabSearch?.focus(),0);}else closeCollaboratorMenu();});
+      collabSearch?.addEventListener("input",()=>{const q=collabSearch.value.trim().toLowerCase();$$('.editor-collab-option',collabPicker).forEach(row=>row.classList.toggle('hidden',q&&!row.dataset.collabSearch.includes(q)));});
+      $$('input[name="collab"]',collabPicker).forEach(input=>input.addEventListener('change',refreshCollaboratorSummary));
+      collaboratorOutsideHandler=e=>{if(!collabMenu.classList.contains("hidden")&&!collabPicker.contains(e.target))closeCollaboratorMenu();};
+      document.addEventListener("pointerdown",collaboratorOutsideHandler,true);
+      refreshCollaboratorSummary();
+    }
 
     const typeSelect=$("#ticketType");
     if(typeSelect && !existing){
       typeSelect.addEventListener("change",()=>{
         const template=TICKET_TEMPLATES[typeSelect.value]||TICKET_TEMPLATES.Task;
         $("#ticketPriority").value=template.priority||"Medium";
+        refreshSemanticSelect($("#ticketPriority"),"semantic-priority-");
         $("#ticketArea").value=template.area||"BE";
         if(!$("#ticketLabels").value.trim()) $("#ticketLabels").value=(template.labels||[]).join(", ");
         if(!$("#ticketDescription").value.trim() && template.description) $("#ticketDescription").value=template.description;
