@@ -281,8 +281,59 @@
     checkCloudHealth().catch(err=>{tfLogError("Connection health check failed",err,{apiBaseUrl:normalizedApiBase(cloudConfig.apiBaseUrl),workspaceId:cloudConfig.workspaceId||""});authStatus(err.message,"error");});
   }
 
+  function parseWorkflowSettingRecord(entry,index=0){
+    let value=entry;
+    if(value&&typeof value==="object"&&!Array.isArray(value)&&Object.prototype.hasOwnProperty.call(value,"json")){
+      value=value.json;
+    }
+    if(typeof value==="string"){
+      const trimmed=value.trim();
+      if(trimmed.startsWith("{")&&trimmed.endsWith("}")){
+        try{value=JSON.parse(trimmed);}catch(_){}
+      }
+    }
+    if(!value||typeof value!=="object"||Array.isArray(value))return null;
+    const name=String(value.name||value.status||value.workflow||"").trim();
+    if(!name)return null;
+    const rawOrder=value.order;
+    const orderNumber=Number(rawOrder);
+    const hasExplicitOrder=rawOrder!==undefined&&rawOrder!==null&&rawOrder!==""&&Number.isFinite(orderNumber);
+    return {
+      name,
+      order:hasExplicitOrder?orderNumber:index,
+      hasExplicitOrder,
+      icon:String(value.icon||"").trim(),
+      wip:value.wip??"",
+      source:entry
+    };
+  }
+
+  function extractOrderedWorkflowSettings(remote){
+    const candidates=[
+      ["settings",remote?.settings],
+      ["settings.workflows",remote?.settings?.workflows],
+      ["settings.workflowRows",remote?.settings?.workflowRows],
+      ["workflowSettings",remote?.workflowSettings],
+      ["workflowRows",remote?.workflowRows],
+      ["settingsRows",remote?.settingsRows],
+      ["workflows",remote?.workflows],
+      ["statuses",remote?.statuses]
+    ];
+    for(const [label,source] of candidates){
+      if(!Array.isArray(source)||!source.length)continue;
+      const records=source.map((entry,index)=>parseWorkflowSettingRecord(entry,index)).filter(Boolean);
+      if(!records.length||!records.some(record=>record.hasExplicitOrder))continue;
+      records.sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name));
+      tfLog("info","Workflow settings loaded and sorted by stored order",{source:label,records:records.map(({name,order,icon,wip})=>({name,order,icon,wip}))});
+      return {source:label,records};
+    }
+    return null;
+  }
+
   function normalizeCloudState(remote){
     const next=remote&&typeof remote==="object"?clone(remote):{};
+    const orderedWorkflowSettings=extractOrderedWorkflowSettings(next);
+    const rawSettingsRows=Array.isArray(next.settings)?next.settings.slice():null;
     if(!Array.isArray(next.tickets))next.tickets=[];if(!Array.isArray(next.members))next.members=[];
     if(!Array.isArray(next.statuses)||!next.statuses.length)next.statuses=clone(DEFAULT_STATUSES);
     if(!Array.isArray(next.releases))next.releases=[];if(!Array.isArray(next.documents))next.documents=[];
@@ -292,19 +343,32 @@
     if(!next.fontSizeByMember||typeof next.fontSizeByMember!=="object")next.fontSizeByMember={};
     if(!next.timelinePrefs||typeof next.timelinePrefs!=="object")next.timelinePrefs={};
     if(!next.wipLimits||typeof next.wipLimits!=="object")next.wipLimits={};
-    if(!next.statusIcons||typeof next.statusIcons!=="object")next.statusIcons={};
+    if(!next.statusIcons||typeof next.statusIcons!=="object"||Array.isArray(next.statusIcons))next.statusIcons={};
+    if(!next.wipLimits||typeof next.wipLimits!=="object"||Array.isArray(next.wipLimits))next.wipLimits={};
     if(!next.settings||typeof next.settings!=="object"||Array.isArray(next.settings))next.settings={};
-    if(!Array.isArray(next.settings.workflowOrder)||!next.settings.workflowOrder.length){
+    if(rawSettingsRows)next.settings.workflowRows=rawSettingsRows;
+
+    if(orderedWorkflowSettings){
+      const orderedNames=orderedWorkflowSettings.records.map(record=>record.name);
+      next.settings.workflowOrder=orderedNames.slice();
+      next.workflowOrder=orderedNames.slice();
+      next.statuses=orderedNames.slice();
+      orderedWorkflowSettings.records.forEach(record=>{
+        if(record.icon)next.statusIcons[record.name]=record.icon;
+        if(record.wip!==undefined&&record.wip!==null)next.wipLimits[record.name]=record.wip;
+      });
+    }else if(!Array.isArray(next.settings.workflowOrder)||!next.settings.workflowOrder.length){
       next.settings.workflowOrder=Array.isArray(next.workflowOrder)&&next.workflowOrder.length?next.workflowOrder.slice():(Array.isArray(next.statuses)&&next.statuses.length?next.statuses.slice():clone(DEFAULT_STATUSES));
     }
-    const remoteStatuses=Array.isArray(next.statuses)&&next.statuses.length?next.statuses.slice():clone(DEFAULT_STATUSES);
-    const requestedOrder=next.settings.workflowOrder.slice();
+    const remoteStatuses=Array.isArray(next.statuses)&&next.statuses.length?next.statuses.map(x=>String(x)).slice():clone(DEFAULT_STATUSES);
+    const requestedOrder=next.settings.workflowOrder.map(x=>String(x));
     const reconciled=[];const seenWorkflow=new Set();
     requestedOrder.forEach(value=>{const name=remoteStatuses.find(x=>String(x).toLowerCase()===String(value||"").trim().toLowerCase());if(name&&!seenWorkflow.has(String(name).toLowerCase())){seenWorkflow.add(String(name).toLowerCase());reconciled.push(name);}});
     remoteStatuses.forEach(name=>{if(!seenWorkflow.has(String(name).toLowerCase())){seenWorkflow.add(String(name).toLowerCase());reconciled.push(name);}});
     next.settings.workflowOrder=reconciled.slice();
     next.workflowOrder=reconciled.slice();
     next.statuses=reconciled.slice();
+    tfLog("info","Canonical workflow order after cloud normalization",{order:reconciled.slice(),source:orderedWorkflowSettings?.source||"workspace arrays"});
     next.theme=next.theme||state.theme||"light";
     next.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.risk)t.risk="None";if(!t.blockerNote)t.blockerNote="";if(!Array.isArray(t.dependencies))t.dependencies=[];if(!Array.isArray(t.comments))t.comments=[];if(!Array.isArray(t.subtasks))t.subtasks=[];if(!Array.isArray(t.links))t.links=[];t.start=normalizeDate(t.start);t.end=normalizeDate(t.end);});
     return next;
