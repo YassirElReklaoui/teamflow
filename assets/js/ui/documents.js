@@ -185,7 +185,47 @@
   function renderReleaseEditor(){
     const el=$("#releaseEditor"); if(!el) return;
     ensureAdvancedState();
-    el.innerHTML=(state.releases||[]).map((r,i)=>{const visibility=releaseVisibility(r);const used=state.tickets.filter(t=>t.release===r).length;return `<div class="release-row release-lifecycle-row ${visibility}"><div class="release-row-main"><strong>${esc(r)}</strong><small>${used} ticket${used===1?'':'s'} · <span class="release-state-badge ${visibility}">${visibility}</span></small></div><div class="release-row-actions">${visibility==='active'?`<button class="btn small" data-release-action="hide" data-release-name="${esc(r)}" type="button">Hide</button><button class="btn small" data-release-action="archive" data-release-name="${esc(r)}" type="button">Archive</button>`:`<button class="btn small" data-release-action="active" data-release-name="${esc(r)}" type="button">Activate</button>${visibility==='hidden'?`<button class="btn small" data-release-action="archive" data-release-name="${esc(r)}" type="button">Archive</button>`:`<button class="btn small" data-release-action="hide" data-release-name="${esc(r)}" type="button">Hide</button>`}` }<button class="btn small subtle-danger" type="button" data-remove-release="${i}">Remove</button></div></div>`;}).join('');
+    const releases=state.releases||[];
+    const counts={active:0,hidden:0,archived:0};
+    releases.forEach(r=>{const v=releaseVisibility(r);counts[v]=(counts[v]||0)+1;});
+    const stateCopy={
+      active:{label:'Active',hint:'Visible on the Board',icon:'●'},
+      hidden:{label:'Hidden',hint:'Tickets hidden from Board',icon:'◐'},
+      archived:{label:'Archived',hint:'Milestone retired',icon:'◇'}
+    };
+    const cards=releases.map((r,i)=>{
+      const visibility=releaseVisibility(r);
+      const used=state.tickets.filter(t=>t.release===r).length;
+      const archivedTickets=state.tickets.filter(t=>t.release===r&&t.archived).length;
+      const openTickets=Math.max(0,used-archivedTickets);
+      const meta=stateCopy[visibility]||stateCopy.active;
+      const actions=visibility==='active'
+        ? `<button class="release-action secondary" data-release-action="hide" data-release-name="${esc(r)}" type="button">Hide</button><button class="release-action warning" data-release-action="archive" data-release-name="${esc(r)}" type="button">Archive</button>`
+        : visibility==='hidden'
+          ? `<button class="release-action success" data-release-action="active" data-release-name="${esc(r)}" type="button">Activate</button><button class="release-action warning" data-release-action="archive" data-release-name="${esc(r)}" type="button">Archive</button>`
+          : `<button class="release-action success" data-release-action="active" data-release-name="${esc(r)}" type="button">Restore</button><button class="release-action secondary" data-release-action="hide" data-release-name="${esc(r)}" type="button">Hide</button>`;
+      return `<article class="release-lifecycle-card ${visibility}">
+        <div class="release-card-accent"></div>
+        <div class="release-card-top">
+          <div class="release-card-identity"><span class="release-card-icon">${meta.icon}</span><div><strong>${esc(r)}</strong><small>${meta.hint}</small></div></div>
+          <span class="release-state-chip ${visibility}">${meta.label}</span>
+        </div>
+        <div class="release-card-metrics">
+          <div><b>${used}</b><span>tickets</span></div>
+          <div><b>${openTickets}</b><span>visible data</span></div>
+          <div><b>${archivedTickets}</b><span>ticket archives</span></div>
+        </div>
+        <div class="release-card-foot">
+          <div class="release-card-impact"><span class="release-impact-dot"></span>${used?`${used} ticket${used===1?'':'s'} linked`:'No tickets linked'}</div>
+          <div class="release-card-actions">${actions}<button class="release-action danger" type="button" data-remove-release="${i}">Remove</button></div>
+        </div>
+      </article>`;
+    }).join('');
+    el.innerHTML=`<div class="release-overview-strip">
+      <div class="release-overview-item active"><span></span><b>${counts.active||0}</b><small>Active</small></div>
+      <div class="release-overview-item hidden"><span></span><b>${counts.hidden||0}</b><small>Hidden</small></div>
+      <div class="release-overview-item archived"><span></span><b>${counts.archived||0}</b><small>Archived</small></div>
+    </div><div class="release-card-grid">${cards||'<div class="release-empty-state"><b>No milestones yet</b><span>Create the first release above.</span></div>'}</div>`;
     $$('[data-release-action]').forEach(btn=>btn.addEventListener('click',()=>{const name=btn.dataset.releaseName;const next=btn.dataset.releaseAction;setReleaseVisibility(name,next);saveState();renderReleaseEditor();renderMemberSelects();renderBoard();toast(`${name} is now ${next}`);}));
     $$('[data-remove-release]').forEach(btn=>btn.addEventListener('click',async()=>{
       const index=Number(btn.dataset.removeRelease);

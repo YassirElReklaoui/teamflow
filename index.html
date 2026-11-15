@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
   <title>TeamFlow — Global Investigation System</title>
-  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-release-archive-1" />
+  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-settings-ui-1" />
     <script src="./assets/js/services/api.js?v=20261115-release-archive-1" defer></script>
   <script src="./assets/js/core/runtime.js?v=20261115-release-archive-1" defer></script>
   <script src="./assets/js/services/domain.js?v=20261115-release-archive-1" defer></script>
   <script src="./assets/js/ui/views.js?v=20261115-release-archive-1" defer></script>
   <script src="./assets/js/ui/editors.js?v=20261115-release-archive-1" defer></script>
-  <script src="./assets/js/ui/documents.js?v=20261115-release-archive-1" defer></script>
+  <script src="./assets/js/ui/documents.js?v=20261115-settings-ui-1" defer></script>
   <script src="./assets/js/ui/notifications.js?v=20261115-release-archive-1" defer></script>
   <script src="./assets/js/dom/bindings.js?v=20261115-release-archive-1" defer></script>
   <script src="./assets/js/bootstrap.js?v=20261115-release-archive-1" defer></script>
@@ -378,9 +378,12 @@
               <div id="wipEditor" class="wip-editor"></div>
             </div>
             <div class="setting settings-card release-settings">
-              <div class="setting-head"><span class="setting-icon green">◆</span><div><h3>Releases / Milestones</h3><p>Manage release lifecycle and visibility without changing ticket workflow.</p></div></div>
-              <div class="status-row settings-add-row"><input id="newReleaseName" class="control" placeholder="e.g. UAT Release 1" /><button class="btn primary" id="addRelease" type="button">＋ Add</button></div>
-              <div id="releaseEditor" class="release-editor settings-list" style="margin-top:12px"></div>
+              <div class="setting-head release-setting-head"><span class="setting-icon green">◆</span><div><h3>Releases / Milestones</h3><p>Control visibility and lifecycle without changing ticket workflow or deleting ticket data.</p></div></div>
+              <div class="release-create-box">
+                <div class="release-create-copy"><strong>Create milestone</strong><small>Add a delivery milestone and keep its lifecycle independent from workflow status.</small></div>
+                <div class="release-create-controls"><input id="newReleaseName" class="control" placeholder="e.g. UAT Release 1" /><button class="btn primary" id="addRelease" type="button">＋ Add</button></div>
+              </div>
+              <div id="releaseEditor" class="release-editor settings-list"></div>
             </div>
             <div class="setting settings-card settings-wide backup-settings">
               <div class="setting-head"><span class="setting-icon teal">↶</span><div><h3>Backup history</h3><p>Persistent browser copies of shared data are disabled for security. Use TeamFlow activity and server-side history for recovery/audit.</p></div></div>
