@@ -439,7 +439,7 @@
             </aside>
           </div>
 
-          <div class="modal-actions detail-actions"><button id="detailDelete" class="btn danger detail-footer-btn" type="button">${dIcons.delete}<span>Delete</span></button><button id="detailFavorite" class="btn detail-footer-btn" type="button">${dIcons.favorite}<span>${isFavorite(t.id)?'Favorite':'Favorite'}</span></button><button id="detailDuplicate" class="btn detail-footer-btn" type="button">${dIcons.duplicate}<span>Duplicate</span></button><div class="spacer"></div><button id="detailCloseBtn" class="btn" type="button">Close</button><button id="detailEdit" class="btn primary detail-footer-btn" type="button">${dIcons.edit}<span>Edit Ticket</span></button></div>
+          <div class="modal-actions detail-actions"><button id="detailDelete" class="btn danger detail-footer-btn" type="button">${dIcons.delete}<span>Delete</span></button><button id="detailFavorite" class="btn detail-footer-btn" type="button">${dIcons.favorite}<span>${isFavorite(t.id)?'Favorite':'Favorite'}</span></button><button id="detailDuplicate" class="btn detail-footer-btn" type="button">${dIcons.duplicate}<span>Duplicate</span></button><button id="detailArchive" class="btn detail-footer-btn archive-ticket-btn" type="button"><span>${t.archived?'↶':'▣'}</span><span>${t.archived?'Restore':'Archive'}</span></button><div class="spacer"></div><button id="detailCloseBtn" class="btn" type="button">Close</button><button id="detailEdit" class="btn primary detail-footer-btn" type="button">${dIcons.edit}<span>Edit Ticket</span></button></div>
         </div>
       </div>`;
     const close=()=>{ticketDetailStack=[];$("#modalRoot").innerHTML="";};
@@ -492,6 +492,7 @@
       logActivity('update',t,`Checklist: ${st.text} ${st.done?"completed":"reopened"}`);saveState();refreshDataViews();openTicketDetails(t.id,{preserveStack:true});
     }));
     if($('#detailFavorite')) $('#detailFavorite').addEventListener('click',()=>{toggleFavorite(t.id);logActivity('favorite',t,isFavorite(t.id)?'Added to favorites':'Removed from favorites');saveState();renderOverview();openTicketDetails(t.id,{preserveStack:true});});
+    if($('#detailArchive')) $('#detailArchive').addEventListener('click',async()=>{const next=!t.archived;const ok=next?await confirmAction({title:'Archive this ticket?',message:'The ticket stays stored with its current workflow and release, but disappears from normal Board views.',subject:`${t.id} · ${t.title}`,confirmLabel:'Archive ticket',icon:'▣'}):true;if(!ok)return;t.archived=next;t.history=t.history||[];t.history.unshift(next?'Ticket archived':'Ticket restored from archive');logActivity('update',t,next?'Archived ticket':'Restored ticket from archive');saveState();refreshDataViews();if(next){$('#modalRoot').innerHTML='';toast(`${t.id} archived`);}else{openTicketDetails(t.id,{preserveStack:true});toast(`${t.id} restored`);}});
     if($('#detailDuplicate')) $('#detailDuplicate').addEventListener('click',()=>duplicateTicket(t.id));
     $$('[data-comment-like]').forEach(btn=>btn.addEventListener('click',()=>{
       const c=(t.comments||[]).find(x=>x.id===btn.dataset.commentLike);if(!c)return;c.reactions=c.reactions||{};c.reactions.like=Array.isArray(c.reactions.like)?c.reactions.like:[];

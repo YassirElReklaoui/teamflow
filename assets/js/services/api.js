@@ -213,7 +213,7 @@
     const rawSettingsRows=Array.isArray(next.settings)?next.settings.slice():null;
     if(!Array.isArray(next.tickets))next.tickets=[];if(!Array.isArray(next.members))next.members=[];
     if(!Array.isArray(next.statuses)||!next.statuses.length)next.statuses=clone(DEFAULT_STATUSES);
-    if(!Array.isArray(next.releases))next.releases=[];if(!Array.isArray(next.documents))next.documents=[];
+    if(!Array.isArray(next.releases))next.releases=[];if(!next.releaseMeta||typeof next.releaseMeta!=="object"||Array.isArray(next.releaseMeta))next.releaseMeta={};if(!Array.isArray(next.documents))next.documents=[];
     if(!Array.isArray(next.activity))next.activity=[];if(!Array.isArray(next.favorites))next.favorites=[];if(!Array.isArray(next.recentTickets))next.recentTickets=[];
     if(!next.savedViewsByMember||typeof next.savedViewsByMember!=="object")next.savedViewsByMember={};
     if(!next.myWorkPrefsByMember||typeof next.myWorkPrefsByMember!=="object")next.myWorkPrefsByMember={};
@@ -247,7 +247,7 @@
     next.statuses=reconciled.slice();
     tfLog("info","Canonical workflow order after cloud normalization",{order:reconciled.slice(),source:orderedWorkflowSettings?.source||"workspace arrays"});
     next.theme=next.theme||state.theme||"light";
-    next.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.risk)t.risk="None";if(!t.blockerNote)t.blockerNote="";if(!Array.isArray(t.dependencies))t.dependencies=[];if(!Array.isArray(t.comments))t.comments=[];if(!Array.isArray(t.subtasks))t.subtasks=[];if(!Array.isArray(t.links))t.links=[];t.start=normalizeDate(t.start);t.end=normalizeDate(t.end);});
+    next.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.risk)t.risk="None";if(!t.blockerNote)t.blockerNote="";if(!Array.isArray(t.dependencies))t.dependencies=[];if(!Array.isArray(t.comments))t.comments=[];if(!Array.isArray(t.subtasks))t.subtasks=[];if(!Array.isArray(t.links))t.links=[];if(typeof t.archived!=="boolean")t.archived=false;t.start=normalizeDate(t.start);t.end=normalizeDate(t.end);});
     return next;
   }
   function syncCurrentMemberToAuthenticatedUser(){
@@ -268,7 +268,7 @@
   }
 
   function renderAfterSharedUpdate(){
-    setTheme(state.theme);ensureMemberColors();ensureAdvancedState();normalizeWorkflowOrder();applyUserFontSize();renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderDocuments();renderOverview();renderTimeline();renderBackups();
+    setTheme(state.theme);ensureMemberColors();ensureAdvancedState();normalizeWorkflowOrder();applyUserFontSize();renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderDocuments();renderOverview();renderTimeline();renderArchivedTickets();renderBackups();
     if(activeView==="mywork")renderMyWork();if(activeView==="insights")renderInsights();syncCustomSelects();
   }
   async function loadRemoteWorkspace({quiet=false}={}){
@@ -335,7 +335,16 @@
     bm.forEach((_,id)=>{if(!am.has(id))ops.push({type:'member.delete',id});});
 
     const br=mapBy(before.releases,(r,i)=>typeof r==='string'?spHash(r):(r.id||spHash(r.name||String(i)))), ar=mapBy(after.releases,(r,i)=>typeof r==='string'?spHash(r):(r.id||spHash(r.name||String(i))));
-    ar.forEach((r,id)=>{const value=typeof r==='string'?{name:r,order:(after.releases||[]).indexOf(r)}:r;if(!br.has(id)||!jsonEqual(typeof br.get(id)==='string'?{name:br.get(id),order:(before.releases||[]).indexOf(br.get(id))}:br.get(id),value))ops.push({type:'release.upsert',id,value});});
+    ar.forEach((r,id)=>{
+      const name=typeof r==='string'?r:r.name;
+      const meta=(after.releaseMeta&&after.releaseMeta[name])||{};
+      const value=typeof r==='string'?{name:r,order:(after.releases||[]).indexOf(r),visibility:meta.visibility||'active'}:{...r,visibility:r.visibility||meta.visibility||'active'};
+      const beforeRaw=br.get(id);
+      const beforeName=typeof beforeRaw==='string'?beforeRaw:beforeRaw?.name;
+      const beforeMeta=(before.releaseMeta&&before.releaseMeta[beforeName])||{};
+      const beforeValue=beforeRaw===undefined?undefined:(typeof beforeRaw==='string'?{name:beforeRaw,order:(before.releases||[]).indexOf(beforeRaw),visibility:beforeMeta.visibility||'active'}:{...beforeRaw,visibility:beforeRaw.visibility||beforeMeta.visibility||'active'});
+      if(!br.has(id)||!jsonEqual(beforeValue,value))ops.push({type:'release.upsert',id,value});
+    });
     br.forEach((_,id)=>{if(!ar.has(id))ops.push({type:'release.delete',id});});
 
     const bd=mapBy((before.documents||[]).filter(d=>d.kind!=='pdf-local'),d=>d.id||spHash(d.name||'')), ad=mapBy((after.documents||[]).filter(d=>d.kind!=='pdf-local'),d=>d.id||spHash(d.name||''));
@@ -498,7 +507,7 @@
     try{if(getCloudToken())await cloudRequest("/auth/logout",{method:"POST"});}catch(err){tfLogError("Logout request failed",err);}
     clearCloudToken();cloudUser=null;cloudReady=false;clearInterval(cloudPollTimer);state=emptySecureState();renderAfterSharedUpdate();showAuthGate("Signed out. Shared data was removed from this browser view.");setSyncStatus("connecting","Sync · sign in");
   }
-  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES)},workflowOrder:clone(DEFAULT_STATUSES)};}
+  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],releaseMeta:{},theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES)},workflowOrder:clone(DEFAULT_STATUSES)};}
 
   function updateCloudSettingsCard(){
     const apiEl=document.getElementById("cloudSettingsApi"),wsEl=document.getElementById("cloudSettingsWorkspace"),userEl=document.getElementById("cloudSettingsUser"),stateEl=document.getElementById("cloudSettingsState"),manage=document.getElementById("cloudManageUsers");

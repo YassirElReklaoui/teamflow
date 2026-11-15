@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
   <title>TeamFlow — Global Investigation System</title>
-  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-semantic-picker-2" />
-    <script src="./assets/js/services/api.js?v=20261115-bulk-atomic-1" defer></script>
-  <script src="./assets/js/core/runtime.js?v=20261115-tabviews-2" defer></script>
-  <script src="./assets/js/services/domain.js?v=20261115-tabviews-2" defer></script>
-  <script src="./assets/js/ui/views.js?v=20261115-tabviews-2" defer></script>
-  <script src="./assets/js/ui/editors.js?v=20261115-semantic-picker-2" defer></script>
-  <script src="./assets/js/ui/documents.js?v=20261115-tabviews-2" defer></script>
-  <script src="./assets/js/ui/notifications.js?v=20261115-tabviews-2" defer></script>
-  <script src="./assets/js/dom/bindings.js?v=20261115-bulk-atomic-1" defer></script>
-  <script src="./assets/js/bootstrap.js?v=20261115-tabviews-2" defer></script>
+  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-release-archive-1" />
+    <script src="./assets/js/services/api.js?v=20261115-release-archive-1" defer></script>
+  <script src="./assets/js/core/runtime.js?v=20261115-release-archive-1" defer></script>
+  <script src="./assets/js/services/domain.js?v=20261115-release-archive-1" defer></script>
+  <script src="./assets/js/ui/views.js?v=20261115-release-archive-1" defer></script>
+  <script src="./assets/js/ui/editors.js?v=20261115-release-archive-1" defer></script>
+  <script src="./assets/js/ui/documents.js?v=20261115-release-archive-1" defer></script>
+  <script src="./assets/js/ui/notifications.js?v=20261115-release-archive-1" defer></script>
+  <script src="./assets/js/dom/bindings.js?v=20261115-release-archive-1" defer></script>
+  <script src="./assets/js/bootstrap.js?v=20261115-release-archive-1" defer></script>
 </head>
 <body>
 <div class="app">
@@ -312,6 +312,16 @@
         </div>
       </section>
 
+      <section id="archiveView" class="view">
+        <div class="panel archive-shell">
+          <div class="archive-hero">
+            <div><span class="archive-kicker">Ticket lifecycle</span><h2>Archived Tickets</h2><p>Archived tickets stay in TeamFlow with their original workflow and release, but are hidden from normal Board views.</p></div>
+            <div class="archive-hero-count"><b id="archiveCount">0</b><span>archived</span></div>
+          </div>
+          <div id="archiveTickets" class="archive-ticket-grid"></div>
+        </div>
+      </section>
+
       <section id="settingsView" class="view">
         <div class="panel settings-shell">
           <div class="settings-hero">
@@ -368,7 +378,7 @@
               <div id="wipEditor" class="wip-editor"></div>
             </div>
             <div class="setting settings-card release-settings">
-              <div class="setting-head"><span class="setting-icon green">◆</span><div><h3>Releases / Milestones</h3><p>Manage release values used by planning, filters and readiness views.</p></div></div>
+              <div class="setting-head"><span class="setting-icon green">◆</span><div><h3>Releases / Milestones</h3><p>Manage release lifecycle and visibility without changing ticket workflow.</p></div></div>
               <div class="status-row settings-add-row"><input id="newReleaseName" class="control" placeholder="e.g. UAT Release 1" /><button class="btn primary" id="addRelease" type="button">＋ Add</button></div>
               <div id="releaseEditor" class="release-editor settings-list" style="margin-top:12px"></div>
             </div>

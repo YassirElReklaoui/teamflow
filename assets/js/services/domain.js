@@ -465,6 +465,8 @@
     if(!state.fontSizeByMember || typeof state.fontSizeByMember!=="object" || Array.isArray(state.fontSizeByMember)) state.fontSizeByMember={};
     if(!state.statusIcons || typeof state.statusIcons!=="object" || Array.isArray(state.statusIcons)) state.statusIcons={};
     if(!state.settings||typeof state.settings!=="object"||Array.isArray(state.settings))state.settings={};
+    if(!state.releaseMeta||typeof state.releaseMeta!=="object"||Array.isArray(state.releaseMeta))state.releaseMeta={};
+    (state.releases||[]).forEach(name=>{if(!state.releaseMeta[name])state.releaseMeta[name]={visibility:"active"};if(!["active","hidden","archived"].includes(state.releaseMeta[name].visibility))state.releaseMeta[name].visibility="active";});
     if(!Array.isArray(state.settings.workflowOrder))state.settings.workflowOrder=[];
     if(!Array.isArray(state.workflowOrder)) state.workflowOrder=[];
     if(!state.timelinePrefs || typeof state.timelinePrefs!=="object" || Array.isArray(state.timelinePrefs)) state.timelinePrefs={};
@@ -483,6 +485,7 @@
     state.tickets.forEach(t=>{
       if(!Array.isArray(t.subtasks)) t.subtasks=[];
       if(typeof t.autoProgress!=="boolean") t.autoProgress=false;
+      if(typeof t.archived!=="boolean") t.archived=false;
       (t.comments||[]).forEach((c,i)=>{
         if(!c.id) c.id=`c_${String(t.id).replace(/[^a-z0-9]/gi,'')}_${i}_${Date.now().toString(36)}`;
         if(!c.reactions || typeof c.reactions!=="object") c.reactions={};
@@ -491,6 +494,18 @@
     state.statuses.forEach(s=>{if(!(s in state.wipLimits)) state.wipLimits[s]="";});
     Object.keys(state.wipLimits).forEach(s=>{if(!state.statuses.includes(s)) delete state.wipLimits[s];});
   }
+
+
+  function unarchivedTickets(list=state.tickets){return (list||[]).filter(t=>!t.archived);}
+
+  function releaseVisibility(name){ensureAdvancedState();return state.releaseMeta?.[name]?.visibility||'active';}
+  function releaseVisibleOnBoard(name){return !name || releaseVisibility(name)==='active';}
+  function setReleaseVisibility(name,visibility){
+    ensureAdvancedState();
+    if(!state.releaseMeta[name])state.releaseMeta[name]={visibility:'active'};
+    state.releaseMeta[name].visibility=['active','hidden','archived'].includes(visibility)?visibility:'active';
+  }
+  function activeReleaseNames(){ensureAdvancedState();return (state.releases||[]).filter(name=>releaseVisibility(name)==='active');}
 
   function fontPrefKey(){
     const member=state.members.find(m=>m.name===state.currentMember) || state.members[0];

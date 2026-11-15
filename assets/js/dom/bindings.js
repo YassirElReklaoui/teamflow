@@ -162,7 +162,7 @@
   $("#themeToggle").addEventListener("click",()=>setTheme(state.theme==="dark"?"light":"dark"));
   $("#settingsTheme").addEventListener("click",()=>setTheme(state.theme==="dark"?"light":"dark"));
   $("#settingsMembersShortcut")?.addEventListener("click",()=>switchView("team"));
-  $("#settingsArchiveShortcut")?.addEventListener("click",()=>{switchView("board");setTimeout(()=>{const sf=$("#statusFilter");if(sf){sf.value="Deprecated";sf.dispatchEvent(new Event("change",{bubbles:true}));}},0);});
+  $("#settingsArchiveShortcut")?.addEventListener("click",()=>switchView("archive"));
   $("#settingsBackupShortcut")?.addEventListener("click",()=>$(".backup-settings")?.scrollIntoView({behavior:"smooth",block:"center"}));
 
   // Identity follows the authenticated TeamFlow account; there is no manual "Viewing as" switch.
@@ -361,7 +361,7 @@
     const name=$("#newReleaseName").value.trim();
     if(!name)return;
     if(state.releases.some(r=>r.toLowerCase()===name.toLowerCase())){toast("That release already exists");return;}
-    state.releases.push(name);$("#newReleaseName").value="";saveState();renderReleaseEditor();renderMemberSelects();toast(`Release "${name}" added`);
+    state.releases.push(name);state.releaseMeta=state.releaseMeta||{};state.releaseMeta[name]={visibility:"active"};$("#newReleaseName").value="";saveState();renderReleaseEditor();renderMemberSelects();toast(`Release "${name}" added`);
   });
 
   $("#resetData").addEventListener("click",async()=>{

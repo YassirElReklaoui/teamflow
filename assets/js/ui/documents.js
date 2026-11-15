@@ -78,7 +78,7 @@
 
   function renderMyWork(){
     const prefs=ensureMyWorkPrefs();
-    const mine=state.tickets.filter(t=>t.assignee===state.currentMember);
+    const mine=unarchivedTickets().filter(t=>t.assignee===state.currentMember);
     const open=activeTickets(mine);
     const overdue=mine.filter(isOverdue);
     const blocked=mine.filter(isBlocked);
@@ -140,26 +140,27 @@
 
   function renderInsights(){
     ensureAdvancedState();
-    const total=state.tickets.length;
-    const done=state.tickets.filter(t=>["Done","Deployed on SIT"].includes(t.status)).length;
-    const overdue=state.tickets.filter(isOverdue).length;
-    const blocked=state.tickets.filter(isBlocked).length;
-    const avg=total?Math.round(state.tickets.reduce((sum,t)=>sum+normalizeProgress(t.progress),0)/total):0;
+    const normal=unarchivedTickets();
+    const total=normal.length;
+    const done=normal.filter(t=>["Done","Deployed on SIT"].includes(t.status)).length;
+    const overdue=normal.filter(isOverdue).length;
+    const blocked=normal.filter(isBlocked).length;
+    const avg=total?Math.round(normal.reduce((sum,t)=>sum+normalizeProgress(t.progress),0)/total):0;
     const deliveredPct=total?Math.round(done/total*100):0;
     const attention=blocked+overdue;
-    const maxStatus=Math.max(1,...state.statuses.map(status=>state.tickets.filter(t=>t.status===status).length));
-    const maxMember=Math.max(1,...state.members.map(member=>activeTickets(state.tickets.filter(t=>t.assignee===member.name)).length));
+    const maxStatus=Math.max(1,...state.statuses.map(status=>normal.filter(t=>t.status===status).length));
+    const maxMember=Math.max(1,...state.members.map(member=>activeTickets(normal.filter(t=>t.assignee===member.name)).length));
     const statusRows=state.statuses.map(status=>{
-      const count=state.tickets.filter(t=>t.status===status).length;
+      const count=normal.filter(t=>t.status===status).length;
       return `<div class="insight-bar-row"><span>${esc(status)}</span><div class="insight-bar-track"><div class="insight-bar-fill" style="width:${Math.round(count/maxStatus*100)}%"></div></div><strong>${count}</strong></div>`;
     }).join('');
     const releaseRows=state.releases.map(release=>{
-      const list=state.tickets.filter(t=>t.release===release);
+      const list=normal.filter(t=>t.release===release);
       const progress=list.length?Math.round(list.reduce((sum,t)=>sum+normalizeProgress(t.progress),0)/list.length):0;
       return `<div class="insight-bar-row"><span>${esc(release)}</span><div class="insight-bar-track"><div class="insight-bar-fill" style="width:${progress}%"></div></div><strong>${progress}%</strong></div>`;
     }).join('');
     const memberRows=state.members.map(member=>{
-      const count=activeTickets(state.tickets.filter(t=>t.assignee===member.name)).length;
+      const count=activeTickets(normal.filter(t=>t.assignee===member.name)).length;
       return `<div class="insight-bar-row"><span title="${esc(member.name)}">${esc(member.name)}</span><div class="insight-bar-track"><div class="insight-bar-fill" style="width:${Math.round(count/maxMember*100)}%"></div></div><strong>${count}</strong></div>`;
     }).join('');
     selectedReleaseReadiness=selectedReleaseReadiness&&state.releases.includes(selectedReleaseReadiness)?selectedReleaseReadiness:(state.releases[0]||'');
@@ -183,22 +184,17 @@
 
   function renderReleaseEditor(){
     const el=$("#releaseEditor"); if(!el) return;
-    el.innerHTML=state.releases.map((r,i)=>`<div class="release-row"><strong>${esc(r)}</strong><button class="btn small" type="button" data-remove-release="${i}">Remove</button></div>`).join('');
+    ensureAdvancedState();
+    el.innerHTML=(state.releases||[]).map((r,i)=>{const visibility=releaseVisibility(r);const used=state.tickets.filter(t=>t.release===r).length;return `<div class="release-row release-lifecycle-row ${visibility}"><div class="release-row-main"><strong>${esc(r)}</strong><small>${used} ticket${used===1?'':'s'} · <span class="release-state-badge ${visibility}">${visibility}</span></small></div><div class="release-row-actions">${visibility==='active'?`<button class="btn small" data-release-action="hide" data-release-name="${esc(r)}" type="button">Hide</button><button class="btn small" data-release-action="archive" data-release-name="${esc(r)}" type="button">Archive</button>`:`<button class="btn small" data-release-action="active" data-release-name="${esc(r)}" type="button">Activate</button>${visibility==='hidden'?`<button class="btn small" data-release-action="archive" data-release-name="${esc(r)}" type="button">Archive</button>`:`<button class="btn small" data-release-action="hide" data-release-name="${esc(r)}" type="button">Hide</button>`}` }<button class="btn small subtle-danger" type="button" data-remove-release="${i}">Remove</button></div></div>`;}).join('');
+    $$('[data-release-action]').forEach(btn=>btn.addEventListener('click',()=>{const name=btn.dataset.releaseName;const next=btn.dataset.releaseAction;setReleaseVisibility(name,next);saveState();renderReleaseEditor();renderMemberSelects();renderBoard();toast(`${name} is now ${next}`);}));
     $$('[data-remove-release]').forEach(btn=>btn.addEventListener('click',async()=>{
       const index=Number(btn.dataset.removeRelease);
       const r=state.releases[index];
       const used=state.tickets.filter(t=>t.release===r);
-      if(used.length){toast(`Release “${r}” is still used by ${used.length} ticket${used.length===1?"":"s"}`);return;}
-      const ok=await confirmAction({
-        title:"Remove this release?",
-        message:"This release or milestone will be removed from TeamFlow filters and ticket choices.",
-        subject:r,
-        confirmLabel:"Remove release",
-        icon:"−",
-        warning:"No tickets currently use this release."
-      });
-      if(!ok) return;
-      state.releases.splice(index,1);saveState();renderReleaseEditor();renderMemberSelects();toast(`${r} removed`);
+      if(used.length){toast(`Release “${r}” is still used by ${used.length} ticket${used.length===1?'':'s'}`);return;}
+      const ok=await confirmAction({title:'Remove this release?',message:'This release or milestone will be removed from TeamFlow.',subject:r,confirmLabel:'Remove release',icon:'−',warning:'No tickets currently use this release.'});
+      if(!ok)return;
+      state.releases.splice(index,1);if(state.releaseMeta)delete state.releaseMeta[r];saveState();renderReleaseEditor();renderMemberSelects();toast(`${r} removed`);
     }));
     renderSettingsSummary();
   }
@@ -224,6 +220,7 @@
     renderInsights();
     renderOverview();
     renderTimeline();
+    renderArchivedTickets();
   }
 
   function switchView(name){
@@ -239,6 +236,7 @@
     if(name==="timeline") renderTimeline();
     if(name==="mywork") renderMyWork();
     if(name==="insights") renderInsights();
+    if(name==="archive") renderArchivedTickets();
     if(name==="settings"){renderStatusEditor();renderWipEditor();renderReleaseEditor();renderBackups();renderSettingsSummary();}
   }
 

@@ -7,19 +7,20 @@
 
   function renderOverview(){
     ensureAdvancedState();
-    const total=state.tickets.length;
-    const delivered=state.tickets.filter(t=>['Done','Deployed on SIT'].includes(t.status)).length;
-    const overdue=state.tickets.filter(isOverdue).length;
-    const blocked=state.tickets.filter(isBlocked).length;
-    const active=activeTickets(state.tickets).length;
-    const avg=total?Math.round(state.tickets.reduce((sum,t)=>sum+normalizeProgress(t.progress),0)/total):0;
-    const dueSoon=state.tickets.filter(t=>{const d=dueInfo(t);return ['today','soon'].includes(d.cls)}).length;
-    const fav=state.favorites.map(id=>state.tickets.find(t=>t.id===id)).filter(Boolean).slice(0,5);
-    const recent=state.recentTickets.map(id=>state.tickets.find(t=>t.id===id)).filter(Boolean).slice(0,5);
-    const upcoming=state.tickets.filter(t=>t.end&&!['Done','Deployed on SIT','Deprecated'].includes(t.status)).sort((a,b)=>a.end.localeCompare(b.end)).slice(0,6);
+    const normal=unarchivedTickets();
+    const total=normal.length;
+    const delivered=normal.filter(t=>['Done','Deployed on SIT'].includes(t.status)).length;
+    const overdue=normal.filter(isOverdue).length;
+    const blocked=normal.filter(isBlocked).length;
+    const active=activeTickets(normal).length;
+    const avg=total?Math.round(normal.reduce((sum,t)=>sum+normalizeProgress(t.progress),0)/total):0;
+    const dueSoon=normal.filter(t=>{const d=dueInfo(t);return ['today','soon'].includes(d.cls)}).length;
+    const fav=state.favorites.map(id=>normal.find(t=>t.id===id)).filter(Boolean).slice(0,5);
+    const recent=state.recentTickets.map(id=>normal.find(t=>t.id===id)).filter(Boolean).slice(0,5);
+    const upcoming=normal.filter(t=>t.end&&!['Done','Deployed on SIT','Deprecated'].includes(t.status)).sort((a,b)=>a.end.localeCompare(b.end)).slice(0,6);
     const activity=state.activity.slice(0,3);
-    const focus=state.tickets.filter(t=>isBlocked(t)||isOverdue(t)||t.risk==='At Risk').sort((a,b)=>Number(isBlocked(b))-Number(isBlocked(a))).slice(0,4);
-    const statusMax=Math.max(1,...state.statuses.map(status=>state.tickets.filter(t=>t.status===status).length));
+    const focus=normal.filter(t=>isBlocked(t)||isOverdue(t)||t.risk==='At Risk').sort((a,b)=>Number(isBlocked(b))-Number(isBlocked(a))).slice(0,4);
+    const statusMax=Math.max(1,...state.statuses.map(status=>normal.filter(t=>t.status===status).length));
     const svg={
       layers:'<svg viewBox="0 0 24 24"><path d="m12 3 8 4-8 4-8-4 8-4Z"/><path d="m4 12 8 4 8-4"/><path d="m4 17 8 4 8-4"/></svg>',
       alert:'<svg viewBox="0 0 24 24"><path d="M12 4 3.5 19h17L12 4Z"/><path d="M12 9v4"/><path d="M12 16h.01"/></svg>',
@@ -31,7 +32,7 @@
       chart:'<svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>',
       chevron:'<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg>'
     };
-    const statusBars=state.statuses.map(status=>{const n=state.tickets.filter(t=>t.status===status).length;return `<div class="overview-flow-row"><span class="overview-flow-icon">${workflowIconSvg(workflowIconKey(status))}</span><span class="overview-flow-name" title="${esc(status)}">${esc(status)}</span><div class="overview-flow-track"><div class="overview-flow-fill" style="width:${Math.round(n/statusMax*100)}%"></div></div><strong>${n}</strong></div>`}).join('');
+    const statusBars=state.statuses.map(status=>{const n=normal.filter(t=>t.status===status).length;return `<div class="overview-flow-row"><span class="overview-flow-icon">${workflowIconSvg(workflowIconKey(status))}</span><span class="overview-flow-name" title="${esc(status)}">${esc(status)}</span><div class="overview-flow-track"><div class="overview-flow-fill" style="width:${Math.round(n/statusMax*100)}%"></div></div><strong>${n}</strong></div>`}).join('');
     const ticketRows=list=>list.length?list.map(t=>`<button class="overview-ticket modern" data-overview-ticket="${esc(t.id)}" type="button"><b>${esc(t.id)}</b><strong>${esc(t.title)}</strong><span class="overview-status-pill status-${esc(String(t.status).toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${esc(t.status)}</span><i>${svg.chevron}</i></button>`).join(''):'<div class="overview-empty-state"><span>⌑</span><strong>Nothing here yet</strong></div>';
     const focusRows=focus.length?focus.map(t=>`<button class="overview-focus-row" data-overview-ticket="${esc(t.id)}" type="button"><span class="overview-attention-dot ${isBlocked(t)?'blocked':isOverdue(t)?'overdue':'risk'}"></span><strong>${esc(t.id)} · ${esc(t.title)}</strong><span class="overview-attention-pill">${isBlocked(t)?'Blocked':isOverdue(t)?dueInfo(t).text:'At risk'}</span><i>${svg.chevron}</i></button>`).join(''):'<div class="overview-empty-state compact"><span>✓</span><strong>No critical attention items</strong></div>';
     const activityRows=activity.length?activity.map((a,index)=>`<div class="overview-activity-row"><div class="overview-activity-line ${index===activity.length-1?'last':''}"><span class="overview-activity-dot"></span></div><div class="overview-activity-icon">${a.kind==='comment'?'💬':a.kind==='move'?'↔':a.kind==='create'?'＋':'✦'}</div><div class="overview-activity-copy"><strong>${esc(a.by)} · ${esc(a.ticketId||'Workspace')}</strong><p>${esc(a.message||a.title||a.kind)}</p><time>${new Date(a.ts).toLocaleString('en-GB')}</time></div></div>`).join(''):'<div class="overview-empty-state"><span>✦</span><strong>Activity will appear here</strong></div>';
@@ -80,7 +81,7 @@
   }
   function timelineFilteredTickets(){
     const p=timelinePrefs(),f=p.filters||{};
-    return state.tickets.filter(t=>{
+    return unarchivedTickets().filter(t=>{
       if(!timelineParseDate(t.start||t.end)||!timelineParseDate(t.end||t.start))return false;
       if(f.assignee&&t.assignee!==f.assignee)return false;
       if(f.status&&t.status!==f.status)return false;
@@ -90,7 +91,7 @@
     });
   }
   function timelineProjectRange(tickets){
-    const list=tickets.length?tickets:state.tickets.filter(t=>timelineParseDate(t.start||t.end)&&timelineParseDate(t.end||t.start));
+    const list=tickets.length?tickets:unarchivedTickets().filter(t=>timelineParseDate(t.start||t.end)&&timelineParseDate(t.end||t.start));
     if(!list.length){const today=timelineParseDate(localTodayISO())||new Date();return [timelineAddDays(today,-14),timelineAddDays(today,28)];}
     const starts=list.map(t=>timelineParseDate(t.start||t.end)).filter(Boolean),ends=list.map(t=>timelineParseDate(t.end||t.start)).filter(Boolean);
     return [timelineAddDays(new Date(Math.min(...starts.map(d=>d.getTime()))),-2),timelineAddDays(new Date(Math.max(...ends.map(d=>d.getTime()))),2)];
@@ -171,7 +172,7 @@
   function timelineGoToday(){const p=timelinePrefs(),tickets=timelineFilteredTickets(),[start,end]=timelineVisibleRange(tickets),today=timelineParseDate(localTodayISO()),span=Math.max(1,timelineDiffDays(start,end));if(today<start||today>end){const half=Math.floor(span/2);p.rangeStart=timelineISO(timelineAddDays(today,-half));p.rangeEnd=timelineISO(timelineAddDays(today,span-half));saveState();renderTimeline();}setTimeout(()=>{const scroll=$('.timeline-gantt-scroll');if(!scroll||p.mode!=='gantt')return;const s=timelineParseDate(p.rangeStart),x=(timelineDiffDays(s,today)+.5)*timelineZoomConfig().dayWidth;scroll.scrollLeft=Math.max(0,x-scroll.clientWidth/2+125);},30);}
 
   function releaseReadinessHtml(release){
-    const list=state.tickets.filter(t=>t.release===release);const complete=t=>['Done','Deployed on SIT','Deprecated'].includes(t.status)||normalizeProgress(t.progress)>=100;const checks=[['Development',!list.some(t=>(t.type==='Development'||t.area==='BE'||t.area==='FE')&&!complete(t))],['Code review',!list.some(t=>t.status==='Code Review')],['Testing',!list.some(t=>t.type==='Testing'&&!complete(t))],['Documentation',!list.some(t=>t.type==='Documentation'&&!complete(t))],['No blockers',!list.some(isBlocked)]];return `<div class="release-readiness"><div class="overview-card-head"><h3>${esc(release||'Release')} readiness</h3><span>${list.length} ticket${list.length===1?'':'s'}</span></div><div class="readiness-grid">${checks.map(([label,ok])=>`<div class="readiness-item ${ok?'done':''}"><strong>${ok?'✓':'○'} ${label}</strong><span>${ok?'Ready':'Needs attention'}</span></div>`).join('')}</div></div>`;
+    const list=unarchivedTickets().filter(t=>t.release===release);const complete=t=>['Done','Deployed on SIT','Deprecated'].includes(t.status)||normalizeProgress(t.progress)>=100;const checks=[['Development',!list.some(t=>(t.type==='Development'||t.area==='BE'||t.area==='FE')&&!complete(t))],['Code review',!list.some(t=>t.status==='Code Review')],['Testing',!list.some(t=>t.type==='Testing'&&!complete(t))],['Documentation',!list.some(t=>t.type==='Documentation'&&!complete(t))],['No blockers',!list.some(isBlocked)]];return `<div class="release-readiness"><div class="overview-card-head"><h3>${esc(release||'Release')} readiness</h3><span>${list.length} ticket${list.length===1?'':'s'}</span></div><div class="readiness-grid">${checks.map(([label,ok])=>`<div class="readiness-item ${ok?'done':''}"><strong>${ok?'✓':'○'} ${label}</strong><span>${ok?'Ready':'Needs attention'}</span></div>`).join('')}</div></div>`;
   }
 
   function renderQuickFilters(){
@@ -229,12 +230,12 @@
     const release=$("#releaseFilter");
     if(release){
       const prevRelease=release.value;
-      release.innerHTML='<option value="">Release: All</option>'+state.releases.map(r=>`<option>${esc(r)}</option>`).join("");
-      if(state.releases.includes(prevRelease)) release.value=prevRelease;
+      const boardReleases=activeReleaseNames();release.innerHTML='<option value="">Release: All</option>'+boardReleases.map(r=>`<option>${esc(r)}</option>`).join("");
+      if(boardReleases.includes(prevRelease)) release.value=prevRelease;
     }
     if($("#bulkStatus")) $("#bulkStatus").innerHTML='<option value="">Keep current</option>'+state.statuses.map(x=>`<option>${esc(x)}</option>`).join("");
     if($("#bulkAssignee")) $("#bulkAssignee").innerHTML='<option value="">Keep current</option>'+state.members.map(x=>`<option>${esc(x.name)}</option>`).join("");
-    if($("#bulkRelease")) $("#bulkRelease").innerHTML='<option value="">Keep current</option>'+state.releases.map(x=>`<option>${esc(x)}</option>`).join("");
+    if($("#bulkRelease")) $("#bulkRelease").innerHTML='<option value="">Keep current</option>'+activeReleaseNames().map(x=>`<option>${esc(x)}</option>`).join("");
     renderSavedViews();
   }
 
@@ -264,12 +265,13 @@
   }
 
   function renderBoardHeroStats(){
-    const total=state.tickets.length;
-    const done=state.tickets.filter(t=>t.status==='Done').length;
-    const inProgress=state.tickets.filter(t=>['Ongoing','Code Review'].includes(t.status)).length;
-    const onHold=state.tickets.filter(t=>t.status==='On hold').length;
-    const overdue=state.tickets.filter(isOverdue).length;
-    const progress=total?Math.round(state.tickets.reduce((sum,t)=>sum+normalizeProgress(t.progress,0),0)/total):0;
+    const visible=state.tickets.filter(t=>!t.archived&&releaseVisibleOnBoard(t.release));
+    const total=visible.length;
+    const done=visible.filter(t=>t.status==='Done').length;
+    const inProgress=visible.filter(t=>['Ongoing','Code Review'].includes(t.status)).length;
+    const onHold=visible.filter(t=>t.status==='On hold').length;
+    const overdue=visible.filter(isOverdue).length;
+    const progress=total?Math.round(visible.reduce((sum,t)=>sum+normalizeProgress(t.progress,0),0)/total):0;
     if($('#heroTotal'))$('#heroTotal').textContent=total;
     if($('#heroProgress'))$('#heroProgress').textContent=progress+'%';
     if($('#heroProgressRing'))$('#heroProgressRing').style.setProperty('--progress',progress);
@@ -280,6 +282,8 @@
   }
 
   function ticketMatches(ticket){
+    if(ticket?.archived) return false;
+    if(ticket?.release && !releaseVisibleOnBoard(ticket.release)) return false;
     const q = $("#globalSearch").value.trim().toLowerCase();
     const af = $("#assigneeFilter").value;
     const sf = $("#statusFilter").value;
@@ -433,7 +437,7 @@
     function buildColumns(list,container){
       const boardOrder=ensureSharedWorkflowOrder();
       boardOrder.forEach(statusName=>{
-        const tickets=list.filter(t=>t.status===statusName);const limit=wipLimitFor(statusName);const exceeded=limit&&tickets.length>limit;const col=document.createElement('section');col.className='column'+(exceeded?' wip-exceeded':'');col.dataset.status=statusName;col.innerHTML=`<div class="column-head">${workflowIcon(statusName)}<strong>${esc(statusName)}</strong><span class="count">${tickets.length}${limit?` / ${limit}`:''}</span>${exceeded?'<span class="wip-warning">WIP exceeded</span>':''}<button class="add" type="button" aria-label="Add ticket">＋</button></div><div class="cards"></div>`;$('.add',col).onclick=()=>openTicketModal(null,statusName);const cards=$('.cards',col);tickets.forEach(t=>cards.appendChild(makeTicket(t)));if(!tickets.length)cards.innerHTML='<div class="empty">No matching tickets</div>';
+        const tickets=list.filter(t=>t.status===statusName);const limit=wipLimitFor(statusName);const exceeded=limit&&tickets.length>limit;const col=document.createElement('section');col.className='column'+(exceeded?' wip-exceeded':'');col.dataset.status=statusName;col.innerHTML=`<div class="column-head">${workflowIcon(statusName)}<strong>${esc(statusName)}</strong><span class="count">${tickets.length}${limit?` / ${limit}`:''}</span>${exceeded?'<span class="wip-warning">WIP exceeded</span>':''}${bulkMode&&tickets.length?`<button class="bulk-column-select" type="button" title="Select all tickets in ${esc(statusName)}">Select all</button>`:''}<button class="add" type="button" aria-label="Add ticket">＋</button></div><div class="cards"></div>`;$('.add',col).onclick=()=>openTicketModal(null,statusName);const bulkCol=$('.bulk-column-select',col);if(bulkCol)bulkCol.onclick=(e)=>{e.stopPropagation();const all=tickets.every(t=>bulkSelected.has(t.id));tickets.forEach(t=>all?bulkSelected.delete(t.id):bulkSelected.add(t.id));renderBoard();toast(all?`${statusName} selection cleared`:`${tickets.length} ${statusName} ticket${tickets.length===1?'':'s'} selected`);};const cards=$('.cards',col);tickets.forEach(t=>cards.appendChild(makeTicket(t)));if(!tickets.length)cards.innerHTML='<div class="empty">No matching tickets</div>';
         if(!bulkMode){col.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';col.classList.add('drag-over');});col.addEventListener('dragleave',e=>{if(!col.contains(e.relatedTarget))col.classList.remove('drag-over');});col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('drag-over');const id=e.dataTransfer.getData('text/plain');const ticket=state.tickets.find(t=>t.id===id);if(ticket&&ticket.status!==statusName){const old=ticket.status;ticket.status=statusName;ticket.history=ticket.history||[];ticket.history.unshift(`Status changed to ${statusName}`);logActivity('move',ticket,`Moved ${old} → ${statusName}`);saveState();refreshDataViews();toast(`${id} moved to ${statusName}`);}});}
         container.appendChild(col);
       });
@@ -458,6 +462,16 @@
     const title=$('.bulk-mode-copy strong',btn),hint=$('.bulk-mode-copy small',btn);
     if(title)title.textContent=bulkMode?'Bulk mode active':'Bulk edit';
     if(hint)hint.textContent=bulkMode?(count?`${count} ticket${count===1?'':'s'} selected`:'Select tickets on the board'):'Multi-select tickets';
+  }
+
+
+  function renderArchivedTickets(){
+    const root=$("#archiveTickets");if(!root)return;
+    const tickets=(state.tickets||[]).filter(t=>t.archived);
+    if($("#archiveCount"))$("#archiveCount").textContent=tickets.length;
+    root.innerHTML=tickets.length?tickets.map(t=>`<article class="archive-ticket-card" data-archive-ticket="${esc(t.id)}"><div class="archive-ticket-icon">${ticketMetaIcon('ticket')}</div><div class="archive-ticket-main"><div class="archive-ticket-top"><span># ${esc(t.id)}</span><span class="status-dot-label">${esc(t.status||'—')}</span></div><strong>${esc(t.title||'Untitled ticket')}</strong><div class="archive-ticket-meta"><span>${esc(t.assignee||'Unassigned')}</span><span>${esc(t.release||'No release')}</span><span>${esc(t.priority||'—')}</span></div></div><div class="archive-ticket-actions"><button class="btn small" type="button" data-open-archived="${esc(t.id)}">Open</button><button class="btn small primary" type="button" data-restore-archived="${esc(t.id)}">Restore</button></div></article>`).join(''):'<div class="archive-empty"><strong>No archived tickets</strong><span>Archived tickets will appear here without changing their workflow or release.</span></div>';
+    $$('[data-open-archived]').forEach(btn=>btn.addEventListener('click',()=>openTicketModal(btn.dataset.openArchived)));
+    $$('[data-restore-archived]').forEach(btn=>btn.addEventListener('click',()=>{const t=state.tickets.find(x=>x.id===btn.dataset.restoreArchived);if(!t)return;t.archived=false;t.history=t.history||[];t.history.unshift('Ticket restored from archive');logActivity('update',t,'Restored ticket from archive');saveState();refreshDataViews();renderArchivedTickets();toast(`${t.id} restored`);}));
   }
 
   function renderTeam(){
