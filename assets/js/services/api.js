@@ -651,6 +651,7 @@
     [document.getElementById("addStatus"),document.getElementById("addWorkflowStep"),document.getElementById("settingsBackupShortcut"),document.getElementById("createBackupNow")].forEach(el=>{if(el)el.style.display=isAdmin?"inline-flex":"none";});
     const settingsView=document.getElementById("settingsView");if(settingsView)settingsView.classList.toggle("is-non-admin",!isAdmin);
     const localDataCard=document.querySelector("#settingsView .local-settings");if(localDataCard)localDataCard.style.display=isAdmin?"":"none";
+    const workspaceCard=document.querySelector("#settingsView .workspace-identity-settings");if(workspaceCard)workspaceCard.style.display=isAdmin?"":"none";
     const workspaceFields=[document.getElementById("workspaceDisplayName"),document.getElementById("workspaceTicketPrefix"),document.getElementById("workspaceFallbackPoll")];workspaceFields.forEach(el=>{if(el)el.disabled=!isAdmin;});
     const workspaceSave=document.getElementById("saveWorkspaceIdentity");if(workspaceSave)workspaceSave.style.display=isAdmin?"inline-flex":"none";
     const workspaceReadOnly=document.getElementById("workspaceIdentityReadOnly");if(workspaceReadOnly)workspaceReadOnly.classList.toggle("hidden",isAdmin);
