@@ -2258,3 +2258,66 @@ html,body,*{
 [data-theme="dark"] #archiveView .archive-priority.high{background:rgba(220,38,38,.18);color:#fca5a5}[data-theme="dark"] #archiveView .archive-priority.medium{background:rgba(245,158,11,.17);color:#fbbf24}[data-theme="dark"] #archiveView .archive-priority.low{background:rgba(34,197,94,.15);color:#86efac}[data-theme="dark"] .workflow-remove-action:hover{background:rgba(220,38,38,.12)}[data-theme="dark"] .backup-safety-note{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2)}
 @media(max-width:900px){#archiveView .archive-ticket-grid{grid-template-columns:1fr}#settingsView .cloud-settings-lines{grid-template-columns:1fr 1fr!important}.workflow-setting-card{flex-basis:180px}.backup-setting-head{flex-wrap:wrap}.backup-create-btn{margin-left:45px}}
 @media(max-width:620px){#archiveView .archive-ticket-card{grid-template-columns:38px minmax(0,1fr)}#archiveView .archive-ticket-actions{grid-column:1/-1;justify-content:flex-end}#settingsView .cloud-settings-lines{grid-template-columns:1fr!important}.workflow-order-savebar{align-items:flex-start;flex-direction:column}.backup-card{grid-template-columns:36px minmax(0,1fr)}.backup-card>.btn{grid-column:1/-1;justify-self:end}}
+
+/* === Settings reference-match pass === */
+#settingsView .settings-shell{padding:0!important;background:linear-gradient(180deg,color-mix(in srgb,var(--panel) 98%,#f1edff) 0,var(--panel) 125px)!important;border-radius:24px!important;overflow:hidden!important}
+#settingsView .settings-hero{padding:20px 22px!important;background:linear-gradient(135deg,color-mix(in srgb,#ffffff 72%,#ede8ff),color-mix(in srgb,#eee8ff 72%,var(--panel)))!important;border-bottom:1px solid color-mix(in srgb,var(--accent) 12%,var(--border))!important}
+#settingsView .settings-grid{padding:14px!important;gap:12px!important}
+#settingsView .settings-card{border-radius:16px!important;box-shadow:0 3px 12px rgba(44,36,90,.035)!important}
+#settingsView .settings-section-head{display:flex!important;align-items:center!important;gap:12px!important;margin-bottom:12px!important}
+#settingsView .settings-section-head>div{min-width:0;flex:1}
+#settingsView .settings-section-icon svg{width:20px!important;height:20px!important;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#settingsView .settings-collapse-btn{border:0;background:transparent;color:var(--muted);font-weight:900;font-size:18px;padding:4px 6px;cursor:default}
+#settingsView .workflow-head-actions{display:flex;align-items:center;gap:9px;margin-left:auto}
+#settingsView .settings-info-btn{width:28px;height:28px;border-radius:50%;border:0;background:transparent;color:#312e81;font-weight:900;font-family:Georgia,serif;cursor:help}
+#settingsView .workflow-settings{min-height:0!important}
+#settingsView .workflow-status-stage{margin-top:2px!important}
+#settingsView .workflow-card-strip{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(145px,1fr))!important;gap:10px!important;overflow:visible!important;padding:0!important;scroll-snap-type:none!important;width:100%!important}
+#settingsView .workflow-setting-card{min-width:0!important;max-width:none!important;min-height:164px!important;width:100%!important;padding:12px 12px 0!important;border-radius:15px!important;background:linear-gradient(180deg,#fff,color-mix(in srgb,var(--panel) 96%,#f6f3ff))!important;border:1px solid color-mix(in srgb,var(--border) 90%,#d9d4f5)!important;box-shadow:0 5px 14px rgba(45,38,89,.045)!important;display:flex!important;flex-direction:column!important}
+[data-theme="dark"] #settingsView .workflow-setting-card{background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel-2) 92%,#312e81))!important}
+#settingsView .workflow-card-top{display:flex!important;align-items:center!important;justify-content:space-between!important;margin-bottom:11px!important}
+#settingsView .workflow-card-icon{width:38px!important;height:38px!important;border-radius:12px!important;display:grid!important;place-items:center!important}
+#settingsView .workflow-card-icon svg{width:18px!important;height:18px!important;fill:none!important;stroke:#fff!important;stroke-width:2!important;stroke-linecap:round;stroke-linejoin:round}
+#settingsView .workflow-drag-handle{font-size:13px!important;letter-spacing:1px!important;color:#4b4b75!important;background:transparent!important;padding:3px!important;cursor:grab!important}
+#settingsView .workflow-card-name{font-size:13px!important;font-weight:900!important;margin:0 0 7px!important;color:var(--text)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#settingsView .workflow-card-count,#settingsView .workflow-card-position{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);line-height:1.35}
+#settingsView .workflow-card-position{margin-top:4px}
+#settingsView .workflow-ticket-mark{color:#7c3aed;font-size:10px;line-height:1}
+#settingsView .workflow-position-dot{width:7px;height:7px;background:#22c55e;box-shadow:0 0 0 3px color-mix(in srgb,#22c55e 13%,transparent)}
+#settingsView .workflow-remove-action{margin-top:auto!important;width:calc(100% + 24px)!important;margin-left:-12px!important;margin-right:-12px!important;height:34px!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:6px!important;font-size:10px!important;font-weight:850!important;border-radius:0 0 15px 15px!important}
+#settingsView .workflow-tone-blue .workflow-card-icon{background:#63b3f5!important}
+#settingsView .workflow-tone-green .workflow-card-icon{background:#13b77a!important}
+#settingsView .workflow-tone-amber .workflow-card-icon{background:#f4a72f!important}
+#settingsView .workflow-tone-violet .workflow-card-icon{background:#8b5cf6!important}
+#settingsView .workflow-tone-pink .workflow-card-icon{background:#ec5d95!important}
+#settingsView .workflow-tone-indigo .workflow-card-icon{background:#6366f1!important}
+#settingsView .workflow-tone-teal .workflow-card-icon{background:#14b8a6!important}
+#settingsView .workflow-tone-sky .workflow-card-icon{background:#38bdf8!important}
+#settingsView .workflow-tone-cyan .workflow-card-icon{background:#06b6d4!important}
+#settingsView .workflow-tone-orange .workflow-card-icon{background:#f97316!important}
+#settingsView .workflow-tone-purple .workflow-card-icon{background:#a855f7!important}
+#settingsView .workflow-tone-yellow .workflow-card-icon{background:#eab308!important}
+#settingsView .workflow-tone-slate .workflow-card-icon{background:#64748b!important}
+#settingsView .workflow-order-savebar{margin-top:10px!important;min-height:48px!important;border-radius:12px!important;background:linear-gradient(90deg,color-mix(in srgb,var(--accent-soft) 35%,var(--panel)),var(--panel))!important}
+#settingsView .cloud-settings{padding-bottom:14px!important}
+#settingsView .settings-access-grid{display:grid!important;grid-template-columns:1.15fr 1.15fr 1.15fr 1.65fr 1.1fr!important;gap:9px!important}
+#settingsView .access-tile{display:grid!important;grid-template-columns:30px minmax(0,1fr)!important;gap:8px!important;align-items:center!important;min-height:58px!important;padding:9px 10px!important;border:1px solid color-mix(in srgb,var(--border) 90%,#d8d4f0)!important;border-radius:12px!important;background:linear-gradient(180deg,#fff,color-mix(in srgb,var(--panel-2) 80%,#f8f7ff))!important;overflow:hidden!important}
+[data-theme="dark"] #settingsView .access-tile{background:linear-gradient(180deg,var(--panel),var(--panel-2))!important}
+#settingsView .access-tile:before{display:none!important}
+#settingsView .access-tile-icon{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;background:#f0edff;color:#6d4cff}
+#settingsView .access-tile-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+#settingsView .access-tile>div{min-width:0;display:flex;flex-direction:column;gap:3px}
+#settingsView .access-tile>div>span:first-child{font-size:8px!important;text-transform:uppercase;letter-spacing:.09em;font-weight:900;color:#667085!important}
+#settingsView .access-tile b,#settingsView .access-tile code,#settingsView .access-tile>div>span:last-child{font-size:10px!important;font-weight:850!important;color:var(--text)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:none!important;padding:0!important}
+#settingsView .access-tile.connection .access-tile-icon{background:#e8fbf1;color:#10b981}
+#settingsView .access-tile.team .access-tile-icon{background:#f1edff;color:#7c3aed}
+#settingsView .access-tile.user .access-tile-icon{background:#eeeaff;color:#6d4cff}
+#settingsView .access-tile.server .access-tile-icon{background:#e9f2ff;color:#2563eb}
+#settingsView .access-tile.storage .access-tile-icon{background:#f2edff;color:#7c3aed}
+#settingsView .settings-access-actions{display:flex!important;gap:8px!important;margin-top:9px!important}
+#settingsView .settings-access-actions .btn{min-height:34px!important;border-radius:10px!important;font-size:10px!important}
+#settingsView .settings-access-actions .btn.primary{background:#6d36f2!important;border-color:#6d36f2!important}
+#settingsView .settings-access-actions .btn.danger{background:#ffe8ec!important;border-color:#ffc8d2!important;color:#e11d48!important;box-shadow:none!important}
+[data-theme="dark"] #settingsView .settings-access-actions .btn.danger{background:rgba(225,29,72,.12)!important;border-color:rgba(225,29,72,.25)!important;color:#fb7185!important}
+@media(max-width:1100px){#settingsView .settings-access-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}#settingsView .workflow-card-strip{grid-template-columns:repeat(3,minmax(150px,1fr))!important}}
+@media(max-width:720px){#settingsView .workflow-card-strip{grid-template-columns:repeat(2,minmax(140px,1fr))!important}#settingsView .settings-access-grid{grid-template-columns:1fr!important}#settingsView .workflow-head-actions{margin-left:0}.settings-section-head{flex-wrap:wrap}}

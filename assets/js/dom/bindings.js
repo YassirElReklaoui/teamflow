@@ -353,8 +353,9 @@
 
   $("#addBlankPage").addEventListener("click",openBlankPageModal);
 
-  $("#addStatus").addEventListener("click",()=>{
-    const name=$("#newStatusName").value.trim();
+  $("#addStatus")?.addEventListener("click",()=>{
+    if(cloudUser?.role!=="admin"){toast("Administrator access required");return;}
+    const name=$("#newStatusName")?.value.trim()||"";
     createWorkflowStep({prefillName:name,clearSettingsInput:true});
   });
 

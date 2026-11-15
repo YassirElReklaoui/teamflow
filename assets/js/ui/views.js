@@ -500,23 +500,29 @@
     $$('[data-edit-member]').forEach(btn=>btn.addEventListener('click',()=>{const member=state.members.find(m=>m.id===btn.dataset.editMember);if(!member)return;if(isAdmin)openMemberModal(member.id);else if(linkedSelf?.id===member.id)openPersonalProfileModal();else openMemberModal(member.id,{readOnly:true});}));
   }
 
+  function workflowSettingsVisual(statusName){
+    const key=workflowIconKey(statusName);
+    const palette={play:'blue',activity:'green',pulse:'green',pause:'amber',code:'indigo',check:'violet',deploy:'pink',rocket:'pink',archive:'slate',clock:'sky',review:'cyan',shield:'teal',flag:'orange',database:'purple',star:'yellow',circle:'violet'};
+    return {key,tone:palette[key]||'violet',label:WORKFLOW_ICON_LIBRARY[key]?.label||'General'};
+  }
+
   function renderStatusEditor(){
     const savedOrder=ensureSharedWorkflowOrder();
     const isAdmin=cloudUser?.role==="admin";
     const order=isAdmin?currentWorkflowOrderDraft():savedOrder;
     const dirty=isAdmin&&workflowOrderDraftChanged();
-    const tones=['violet','green','amber','purple','pink','teal','slate'];
     $("#statusEditor").innerHTML = `<div class="workflow-card-strip">${order.map((statusName,i)=>{
       const count=state.tickets.filter(t=>t.status===statusName&&!t.archived).length;
       const sharedIndex=state.statuses.indexOf(statusName);
-      const tone=tones[i%tones.length];
-      return `<article class="workflow-setting-card tone-${tone}" draggable="${isAdmin?'true':'false'}" data-workflow-card="${esc(statusName)}">
-        <div class="workflow-card-top"><span class="workflow-card-icon">${workflowIconSvg(workflowIconKey(statusName))}</span>${isAdmin?'<span class="workflow-drag-handle" title="Drag to reorder">⋮⋮</span>':''}</div>
-        <strong>${esc(statusName)}</strong>
-        <div class="workflow-card-stats"><span>${count} ticket${count===1?'':'s'}</span><span class="workflow-position-dot"></span><span>${dirty?'Draft':'Saved'} position ${i+1}</span></div>
-        ${isAdmin?`<button class="workflow-remove-action" type="button" data-remove-status="${sharedIndex}" ${state.statuses.length<=1?'disabled':''}>⌫ Remove</button>`:'<span class="workflow-admin-label">Admin controlled</span>'}
+      const visual=workflowSettingsVisual(statusName);
+      return `<article class="workflow-setting-card workflow-tone-${visual.tone}" draggable="${isAdmin?'true':'false'}" data-workflow-card="${esc(statusName)}">
+        <div class="workflow-card-top"><span class="workflow-card-icon" title="${esc(visual.label)}" aria-label="${esc(visual.label)}">${workflowIconSvg(visual.key)}</span>${isAdmin?'<span class="workflow-drag-handle" title="Drag to reorder" aria-label="Drag to reorder">•••</span>':''}</div>
+        <strong class="workflow-card-name">${esc(statusName)}</strong>
+        <div class="workflow-card-count"><span class="workflow-ticket-mark">▮</span><span>${count} ticket${count===1?'':'s'}</span></div>
+        <div class="workflow-card-position"><span class="workflow-position-dot"></span><span>${dirty?'Draft':'Saved'} position: ${i+1}</span></div>
+        ${isAdmin?`<button class="workflow-remove-action" type="button" data-remove-status="${sharedIndex}" ${state.statuses.length<=1?'disabled':''}>Remove</button>`:''}
       </article>`;
-    }).join('')}</div>${isAdmin?`<div class="workflow-order-savebar ${dirty?'dirty':''}"><div><strong>${dirty?'Workflow order changed':'Workflow order saved'}</strong><span>${dirty?'Drag cards into place, then save once to share the order with everyone.':'Drag any workflow card to start a new order.'}</span></div><div>${dirty?'<button class="btn" id="discardWorkflowOrder" type="button">Discard</button><button class="btn primary" id="saveWorkflowOrder" type="button">✓ Save order</button>':''}</div></div>`:''}`;
+    }).join('')}</div>${isAdmin?`<div class="workflow-order-savebar ${dirty?'dirty':''}"><div><strong>${dirty?'Workflow order changed':'Workflow order saved'}</strong><span>${dirty?'Drop cards into the preferred order, then save once to share it with everyone.':'Drag any workflow card to start a new order.'}</span></div><div>${dirty?'<button class="btn" id="discardWorkflowOrder" type="button">Discard</button><button class="btn primary" id="saveWorkflowOrder" type="button">✓ Save order</button>':''}</div></div>`:''}`;
 
     if(isAdmin){
       let dragged='';

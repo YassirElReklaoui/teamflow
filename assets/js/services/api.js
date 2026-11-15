@@ -516,7 +516,10 @@
     if(wsEl)wsEl.textContent=cloudConfig.workspaceId||"—";
     if(userEl)userEl.textContent=cloudUser?`${cloudUser.displayName||cloudUser.username} · ${cloudUser.role}`:"Signed out";
     if(stateEl)stateEl.textContent=cloudReady?`Connected · v${cloudVersion}`:"Disconnected";
-    if(manage)manage.style.display=cloudUser?.role==="admin"?"inline-flex":"none";
+    const isAdmin=cloudUser?.role==="admin";
+    if(manage)manage.style.display=isAdmin?"inline-flex":"none";
+    [document.getElementById("addStatus"),document.getElementById("addWorkflowStep")].forEach(el=>{if(el)el.style.display=isAdmin?"inline-flex":"none";});
+    const nameInput=document.getElementById("newStatusName");if(nameInput)nameInput.disabled=!isAdmin;
   }
 
   async function openCloudUsersModal(options={}){
