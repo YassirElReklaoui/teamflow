@@ -147,13 +147,25 @@
     return `<span class="editor-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${paths[name]||paths.details}</svg></span>`;
   }
 
+  function semanticClass(value){return String(value||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
+
+  function semanticPickerHtml({id,kind,value,values}){
+    const cls=`semantic-${kind}-${semanticClass(value)}`;
+    return `<div class="semantic-picker" data-semantic-picker="${esc(id)}" data-semantic-kind="${esc(kind)}">
+      <button class="semantic-picker-trigger ${cls}" type="button" aria-haspopup="listbox" aria-expanded="false">
+        <span class="semantic-dot" aria-hidden="true"></span><span class="semantic-picker-value">${esc(value)}</span><span class="semantic-chevron">⌄</span>
+      </button>
+      <div class="semantic-picker-menu hidden" role="listbox">${values.map(v=>`<button class="semantic-picker-option semantic-${kind}-${semanticClass(v)} ${v===value?'selected':''}" type="button" role="option" aria-selected="${v===value?'true':'false'}" data-value="${esc(v)}"><span class="semantic-dot" aria-hidden="true"></span><span>${esc(v)}</span>${v===value?'<span class="semantic-check">✓</span>':''}</button>`).join("")}</div>
+      <select id="${esc(id)}" class="semantic-picker-native" tabindex="-1" aria-hidden="true">${values.map(v=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(v)}</option>`).join("")}</select>
+    </div>`;
+  }
+
   function ticketForm(ticket){
     const otherTickets=state.tickets.filter(t=>t.id!==ticket.id);
     const assigneeMember=state.members.find(m=>m.name===ticket.assignee);
     const selfMember=linkedMemberForCurrentUser();
     const assigneeInitials=initials(ticket.assignee||"Unassigned");
     const assigneeColor=assigneeMember?.color||memberColor(ticket.assignee||"Unassigned");
-    const semanticClass=value=>String(value||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
     return `
       <div class="editor-detail-layout">
         <div class="editor-primary-column">
@@ -219,10 +231,10 @@
           <section class="editor-side-card editor-key-details-card">
             <div class="editor-side-heading">${editorIcon('details')}<strong>Key details</strong></div>
             <div class="editor-key-details">
-              <div class="editor-key-row"><label>${editorIcon('status')}<span>Status</span></label><select id="ticketStatus" class="editor-semantic-select semantic-status-${semanticClass(ticket.status)}">${state.statuses.map(s=>`<option ${s===ticket.status?"selected":""}>${esc(s)}</option>`).join("")}</select></div>
-              <div class="editor-key-row"><label>${editorIcon('flag')}<span>Priority</span></label><select id="ticketPriority" class="editor-semantic-select semantic-priority-${semanticClass(ticket.priority)}">${["High","Medium","Low"].map(v=>`<option ${v===ticket.priority?"selected":""}>${v}</option>`).join("")}</select></div>
+              <div class="editor-key-row"><label>${editorIcon('status')}<span>Status</span></label>${semanticPickerHtml({id:"ticketStatus",kind:"status",value:ticket.status,values:state.statuses})}</div>
+              <div class="editor-key-row"><label>${editorIcon('flag')}<span>Priority</span></label>${semanticPickerHtml({id:"ticketPriority",kind:"priority",value:ticket.priority,values:["High","Medium","Low"]})}</div>
               <div class="editor-key-row"><label>${editorIcon('area')}<span>Area / ARCH / BE / FE</span></label><select id="ticketArea">${["ARCH","BE","FE","QA"].map(v=>`<option ${v===ticket.area?"selected":""}>${v}</option>`).join("")}</select></div>
-              <div class="editor-key-row"><label>${editorIcon('alert')}<span>Risk / Delivery flag</span></label><select id="ticketRisk" class="editor-semantic-select semantic-risk-${semanticClass(ticket.risk||"None")}">${["None","At Risk","Blocked"].map(v=>`<option ${v===(ticket.risk||"None")?"selected":""}>${v}</option>`).join("")}</select></div>
+              <div class="editor-key-row"><label>${editorIcon('alert')}<span>Risk / Delivery flag</span></label>${semanticPickerHtml({id:"ticketRisk",kind:"risk",value:(ticket.risk||"None"),values:["None","At Risk","Blocked"]})}</div>
               <div class="editor-key-row editor-key-row-progress"><label>${editorIcon('chart')}<span>Progress</span></label><div class="progress-editor editor-side-progress"><input id="ticketProgressRange" type="range" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" /><div class="progress-number"><input id="ticketProgress" type="number" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" /><span>%</span></div></div></div>
               <div class="editor-key-row"><label>${editorIcon('calendar')}<span>Start date</span></label><input id="ticketStart" type="date" value="${esc(ticket.start||"")}" /></div>
               <div class="editor-key-row"><label>${editorIcon('calendar')}<span>Expected end date</span></label><input id="ticketEnd" type="date" value="${esc(ticket.end||"")}" /></div>
@@ -567,6 +579,7 @@
     const close = (commit=false)=>{
       if(draftSessionClosed)return;
       draftSessionClosed=true;
+      closeSemanticPicker?.();
       if(dependencyOutsideHandler) document.removeEventListener("pointerdown",dependencyOutsideHandler,true);
       if(collaboratorOutsideHandler) document.removeEventListener("pointerdown",collaboratorOutsideHandler,true);
       const floatingMenu=$("#editorCollabMenu");if(floatingMenu&&floatingMenu.parentElement===document.body)floatingMenu.remove();
@@ -633,12 +646,16 @@
     progressRange.addEventListener("input",()=>syncProgress(progressRange,progressNumber));
     progressNumber.addEventListener("input",()=>syncProgress(progressNumber,progressRange));
 
-    const semanticSlug=value=>String(value||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
-    const refreshSemanticSelect=(select,prefix)=>{if(!select)return;[...select.classList].filter(c=>c.startsWith(prefix)).forEach(c=>select.classList.remove(c));select.classList.add(prefix+semanticSlug(select.value));};
+    const editorModalRoot=$(".ticket-editor-modal");
+    let activeSemanticPicker=null;
+    const closeSemanticPicker=()=>{if(!activeSemanticPicker)return;const {picker,menu,trigger}=activeSemanticPicker;menu.classList.add("hidden");menu.classList.remove("semantic-picker-floating");trigger.setAttribute("aria-expanded","false");if(menu.parentElement===document.body)picker.appendChild(menu);menu.removeAttribute("style");activeSemanticPicker=null;};
+    const positionSemanticMenu=(picker,menu,trigger)=>{const r=trigger.getBoundingClientRect(),width=Math.max(220,r.width);document.body.appendChild(menu);menu.classList.add("semantic-picker-floating");menu.classList.remove("hidden");menu.style.width=`${width}px`;menu.style.left=`${Math.min(Math.max(10,r.left),window.innerWidth-width-10)}px`;menu.style.visibility="hidden";menu.style.top="10px";requestAnimationFrame(()=>{const h=Math.min(menu.scrollHeight,320),below=window.innerHeight-r.bottom-12;const top=below>=h?r.bottom+7:Math.max(10,r.top-h-7);menu.style.top=`${top}px`;menu.style.visibility="visible";});};
+    const refreshSemanticPicker=select=>{if(!select)return;const picker=select.closest(".semantic-picker"),kind=picker?.dataset.semanticKind;if(!picker||!kind)return;const trigger=$(".semantic-picker-trigger",picker),value=$(".semantic-picker-value",picker);if(value)value.textContent=select.value;[...trigger.classList].filter(c=>c.startsWith(`semantic-${kind}-`)).forEach(c=>trigger.classList.remove(c));trigger.classList.add(`semantic-${kind}-${semanticClass(select.value)}`);const menu=$(".semantic-picker-menu",picker);if(menu)$$('.semantic-picker-option',menu).forEach(option=>{const selected=option.dataset.value===select.value;option.classList.toggle('selected',selected);option.setAttribute('aria-selected',String(selected));let check=$(".semantic-check",option);if(selected&&!check){check=document.createElement('span');check.className='semantic-check';check.textContent='✓';option.appendChild(check);}else if(!selected&&check)check.remove();});};
+    $$('.semantic-picker',editorModalRoot).forEach(picker=>{const trigger=$(".semantic-picker-trigger",picker),menu=$(".semantic-picker-menu",picker),select=$(".semantic-picker-native",picker);trigger?.addEventListener('click',()=>{if(activeSemanticPicker){const same=activeSemanticPicker.picker===picker;closeSemanticPicker();if(same)return;}activeSemanticPicker={picker,menu,trigger};trigger.setAttribute('aria-expanded','true');positionSemanticMenu(picker,menu,trigger);});$$('.semantic-picker-option',menu).forEach(option=>option.addEventListener('click',()=>{select.value=option.dataset.value;closeSemanticPicker();refreshSemanticPicker(select);select.dispatchEvent(new Event('change',{bubbles:true}));}));select?.addEventListener('change',()=>refreshSemanticPicker(select));refreshSemanticPicker(select);});
+    const semanticOutsideHandler=e=>{if(!editorModalRoot?.isConnected){document.removeEventListener('pointerdown',semanticOutsideHandler,true);closeSemanticPicker();return;}if(activeSemanticPicker&&!activeSemanticPicker.picker.contains(e.target)&&!activeSemanticPicker.menu.contains(e.target))closeSemanticPicker();};
+    document.addEventListener('pointerdown',semanticOutsideHandler,true);
+    const refreshSemanticSelect=(select)=>refreshSemanticPicker(select);
     const statusSelect=$("#ticketStatus"),prioritySelect=$("#ticketPriority"),riskSelect=$("#ticketRisk");
-    statusSelect?.addEventListener("change",()=>refreshSemanticSelect(statusSelect,"semantic-status-"));
-    prioritySelect?.addEventListener("change",()=>refreshSemanticSelect(prioritySelect,"semantic-priority-"));
-    riskSelect?.addEventListener("change",()=>refreshSemanticSelect(riskSelect,"semantic-risk-"));
     const assigneeSelect=$("#ticketAssignee"),assigneeAvatar=$("#ticketAssigneeAvatar");
     assigneeSelect?.addEventListener("change",()=>{const member=state.members.find(m=>m.name===assigneeSelect.value);const wrap=assigneeSelect.closest(".editor-assignee-control");if(assigneeAvatar)assigneeAvatar.textContent=initials(assigneeSelect.value||"Unassigned");if(wrap)wrap.style.setProperty("--editor-member-color",member?.color||memberColor(assigneeSelect.value||"Unassigned"));});
     $("#assignTicketToMe")?.addEventListener("click",()=>{const self=linkedMemberForCurrentUser();if(!self||!assigneeSelect)return;assigneeSelect.value=self.name;assigneeSelect.dispatchEvent(new Event("change",{bubbles:true}));toast(`Assigned to ${self.name}`);});
@@ -681,7 +698,7 @@
       typeSelect.addEventListener("change",()=>{
         const template=TICKET_TEMPLATES[typeSelect.value]||TICKET_TEMPLATES.Task;
         $("#ticketPriority").value=template.priority||"Medium";
-        refreshSemanticSelect($("#ticketPriority"),"semantic-priority-");
+        refreshSemanticSelect($("#ticketPriority"));
         $("#ticketArea").value=template.area||"BE";
         if(!$("#ticketLabels").value.trim()) $("#ticketLabels").value=(template.labels||[]).join(", ");
         if(!$("#ticketDescription").value.trim() && template.description) $("#ticketDescription").value=template.description;

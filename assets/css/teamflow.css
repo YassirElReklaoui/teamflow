@@ -2116,3 +2116,40 @@ html[data-theme="dark"] .detail-priority-large.semantic-priority-medium,
 html[data-theme="dark"] .detail-fact-pill.medium{background:#352817!important;border-color:#68491e!important;color:#ffc36a!important}
 html[data-theme="dark"] .detail-priority-large.semantic-priority-low,
 html[data-theme="dark"] .detail-fact-pill.low{background:#173223!important;border-color:#285f3c!important;color:#72da91!important}
+
+
+/* === TeamFlow semantic chip pickers (status / priority / risk) === */
+.semantic-picker{position:relative;min-width:0;width:100%}
+.semantic-picker-native{position:absolute!important;opacity:0!important;pointer-events:none!important;width:1px!important;height:1px!important;overflow:hidden!important}
+.semantic-picker-trigger{width:100%;min-height:40px;display:flex;align-items:center;gap:9px;border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:6px 10px;text-align:left;color:var(--text);font-weight:900;cursor:pointer;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease,transform .12s ease}
+.semantic-picker-trigger:hover{border-color:color-mix(in srgb,var(--accent) 42%,var(--border))}
+.semantic-picker-trigger:focus-visible,.semantic-picker-trigger[aria-expanded="true"]{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
+.semantic-picker-value{display:inline-flex;align-items:center;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.semantic-chevron{margin-left:auto;color:var(--muted);font-size:16px;line-height:1;transform:translateY(-1px)}
+.semantic-dot{width:9px;height:9px;border-radius:999px;flex:0 0 auto;background:currentColor;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 12%,transparent)}
+.semantic-picker-menu{position:absolute;z-index:2800;padding:7px;border:1px solid var(--border);border-radius:14px;background:var(--panel);box-shadow:0 18px 46px rgba(28,34,58,.18);display:grid;gap:4px;max-height:320px;overflow:auto}
+.semantic-picker-menu.hidden{display:none!important}
+.semantic-picker-menu.semantic-picker-floating{position:fixed!important;z-index:9999!important}
+.semantic-picker-option{width:100%;min-height:38px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;border:0;border-radius:10px;background:transparent;padding:7px 10px;color:var(--text);font-weight:800;text-align:left;cursor:pointer}
+.semantic-picker-option:hover{background:var(--panel-2)}
+.semantic-picker-option.selected{box-shadow:inset 0 0 0 1px currentColor}
+.semantic-check{margin-left:auto;font-size:15px;font-weight:950}
+
+/* semantic chip tones: same palette as Board */
+.semantic-status-to-be-started{color:#6136d8!important;background:#f0eaff!important;border-color:#ae91ff!important}
+.semantic-status-ongoing,.semantic-status-code-review{color:#135f9f!important;background:#eaf4ff!important;border-color:#79b8ed!important}
+.semantic-status-on-hold{color:#8c5200!important;background:#fff3d8!important;border-color:#e7b84e!important}
+.semantic-status-done,.semantic-status-deployed-on-sit{color:#126b34!important;background:#e9f8ee!important;border-color:#79cf95!important}
+.semantic-status-deprecated{color:#4c586d!important;background:#eef0f4!important;border-color:#aab2c0!important}
+.semantic-priority-high,.semantic-risk-blocked{color:#b91f2b!important;background:#ffebeb!important;border-color:#f08c8c!important}
+.semantic-priority-medium,.semantic-risk-at-risk{color:#b45200!important;background:#fff0dc!important;border-color:#f0b56d!important}
+.semantic-priority-low{color:#1f703e!important;background:#eaf8ef!important;border-color:#86cf9f!important}
+.semantic-risk-none{color:var(--text)!important;background:var(--panel-2)!important;border-color:var(--border)!important}
+
+html[data-theme="dark"] .semantic-status-to-be-started{color:#c3b2ff!important;background:#28203d!important;border-color:#514078!important}
+html[data-theme="dark"] .semantic-status-ongoing,html[data-theme="dark"] .semantic-status-code-review{color:#7bc8ff!important;background:#172e43!important;border-color:#28506f!important}
+html[data-theme="dark"] .semantic-status-on-hold,html[data-theme="dark"] .semantic-priority-medium,html[data-theme="dark"] .semantic-risk-at-risk{color:#ffc36a!important;background:#352817!important;border-color:#68491e!important}
+html[data-theme="dark"] .semantic-status-done,html[data-theme="dark"] .semantic-status-deployed-on-sit,html[data-theme="dark"] .semantic-priority-low{color:#72da91!important;background:#173223!important;border-color:#285f3c!important}
+html[data-theme="dark"] .semantic-status-deprecated{color:#aeb8c8!important;background:#242933!important;border-color:#4a5363!important}
+html[data-theme="dark"] .semantic-priority-high,html[data-theme="dark"] .semantic-risk-blocked{color:#ff9494!important;background:#3a1d20!important;border-color:#713139!important}
+html[data-theme="dark"] .semantic-risk-none{color:var(--text)!important;background:var(--panel-2)!important;border-color:var(--border)!important}
