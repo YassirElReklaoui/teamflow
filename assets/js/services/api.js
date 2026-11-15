@@ -25,6 +25,28 @@
     try{sessionStorage.removeItem(CLOUD_SESSION_KEY);localStorage.removeItem(CLOUD_REMEMBER_KEY);}catch(_){}
   }
 
+  let cloudReconnectTimer=0;
+  function isExpiredSessionError(err){return Number(err?.status||0)===401;}
+  function isTransientServiceError(err){
+    const status=Number(err?.status||0);
+    return status===0||status===503||status>=500||err?.name==="TypeError";
+  }
+  function scheduleCloudReconnect(delay=5000){
+    clearTimeout(cloudReconnectTimer);
+    if(!getCloudToken())return;
+    cloudReconnectTimer=setTimeout(()=>{
+      if(!getCloudToken())return;
+      if(cloudReady)pollCloud();
+      else connectCloudWorkspace();
+    },delay);
+  }
+  function handleTemporaryServiceFailure(err,context="TeamFlow service"){
+    cloudLastError=String(err?.message||err||"Temporary service error");
+    tfLogError(`${context} temporarily unavailable`,err,{cloudVersion});
+    setSyncStatus("connecting","Sync · reconnecting…","Temporary server/storage problem. Your session is kept and TeamFlow will retry automatically.");
+    scheduleCloudReconnect();
+  }
+
   function ensureSyncBadge(){
     let badge=document.getElementById("cloudSyncStatus");
     if(!badge){
@@ -45,12 +67,19 @@
   async function cloudRequest(path,{method="GET",body,auth=true,headers={}}={}){
     if(!apiConfigured())throw Object.assign(new Error("Server URL is not configured"),{status:0});
     const token=getCloudToken();
-    const response=await fetch(`${normalizedApiBase(cloudConfig.apiBaseUrl)}${path}`,{
-      method,
-      headers:{"Content-Type":"application/json",...(auth&&token?{Authorization:`Bearer ${token}`}:{ }),...headers},
-      body:body===undefined?undefined:JSON.stringify(body),
-      cache:"no-store"
-    });
+    let response;
+    try{
+      response=await fetch(`${normalizedApiBase(cloudConfig.apiBaseUrl)}${path}`,{
+        method,
+        headers:{"Content-Type":"application/json",...(auth&&token?{Authorization:`Bearer ${token}`}:{ }),...headers},
+        body:body===undefined?undefined:JSON.stringify(body),
+        cache:"no-store"
+      });
+    }catch(fetchErr){
+      const err=Object.assign(new Error("Network unavailable"),{status:0,code:"NETWORK_ERROR",cause:fetchErr});
+      tfLogError("API network request failed",err,{path,method});
+      throw err;
+    }
     const text=await response.text();let data={};
     try{data=text?JSON.parse(text):{};}catch(err){tfLogError("API response JSON parsing failed",err,{path,status:response.status,responseText:text.slice(0,500)});data={error:text||`HTTP ${response.status}`};}
     if(!response.ok){const err=Object.assign(new Error(data.error||`HTTP ${response.status}`),{status:response.status,data});tfLogError("API request failed",err,{path,method,status:response.status});throw err;}
@@ -260,7 +289,13 @@
       setSyncStatus("updated","Sync · updated",`Version ${cloudVersion}${cloudLastStamp?` · ${new Date(cloudLastStamp).toLocaleTimeString()}`:""}`);
       setTimeout(()=>{if(!cloudSaving)setSyncStatus("connected","Sync · connected");},1200);
       return data;
-    }catch(err){cloudApplyingRemote=false;cloudLastError=String(err?.message||err);tfLogError("Loading shared workspace failed",err,{quiet,cloudVersion});setSyncStatus("error","Sync · error",cloudLastError);if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your TeamFlow session expired. Sign in again.");}else if(!quiet)toast("Sync unavailable");return null;}
+    }catch(err){
+      cloudApplyingRemote=false;cloudLastError=String(err?.message||err);tfLogError("Loading shared workspace failed",err,{quiet,cloudVersion});
+      if(isExpiredSessionError(err)){clearCloudToken();cloudReady=false;showAuthGate("Your TeamFlow session expired. Sign in again.");setSyncStatus("error","Sync · sign in required",cloudLastError);}
+      else if(isTransientServiceError(err)){handleTemporaryServiceFailure(err,"Workspace loading");if(!quiet)toast("Connection temporarily unavailable — retrying");}
+      else{setSyncStatus("error","Sync · error",cloudLastError);if(!quiet)toast("Sync unavailable");}
+      return null;
+    }
   }
   function jsonEqual(a,b){return JSON.stringify(a)===JSON.stringify(b);}
   function coreTicket(t){
@@ -365,8 +400,12 @@
       return true;
     }catch(err){
       cloudLastError=String(err?.message||err);tfLogError('Minimal mutation save failed',err,{operations});
-      if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate('Your session expired. Sign in again.');}
-      else{setSyncStatus('error','Sync · save failed',cloudLastError);toast('Could not save changes — see Console');}
+      if(isExpiredSessionError(err)){clearCloudToken();cloudReady=false;showAuthGate('Your session expired. Sign in again.');setSyncStatus('error','Sync · sign in required',cloudLastError);}
+      else if(isTransientServiceError(err)){
+        deltaDirty=true;
+        handleTemporaryServiceFailure(err,'Saving changes');
+        setTimeout(()=>{if(getCloudToken()&&cloudReady)scheduleRemoteSave({force:true});},4500);
+      }else{setSyncStatus('error','Sync · save failed',cloudLastError);toast('Could not save changes — see Console');}
       return false;
     }finally{deltaSaving=false;if(deltaDirty&&cloudReady){deltaDirty=false;scheduleRemoteSave();}}
   }
@@ -383,7 +422,12 @@
   async function pollCloud(){
     if(document.hidden||deltaSaving||cloudApplyingRemote||deltaDirty||!cloudReady)return;
     try{const info=await cloudRequest(`/changes?since=${encodeURIComponent(cloudVersion)}`);if(info.changed)await loadRemoteWorkspace({quiet:true});}
-    catch(err){cloudLastError=String(err?.message||err);tfLogError("Cloud polling failed",err,{cloudVersion});if(err.status===401){clearCloudToken();cloudReady=false;showAuthGate("Your session expired. Sign in again.");}else setSyncStatus("error","Sync · error",cloudLastError);}
+    catch(err){
+      cloudLastError=String(err?.message||err);tfLogError("Cloud polling failed",err,{cloudVersion});
+      if(isExpiredSessionError(err)){clearCloudToken();cloudReady=false;showAuthGate("Your session expired. Sign in again.");setSyncStatus("error","Sync · sign in required",cloudLastError);}
+      else if(isTransientServiceError(err)){handleTemporaryServiceFailure(err,"Cloud polling");}
+      else setSyncStatus("error","Sync · error",cloudLastError);
+    }
   }
   async function connectCloudWorkspace(){
     setSyncStatus("connecting","Sync · connecting…");
@@ -393,7 +437,12 @@
       setSyncStatus("connected","Sync · connected",`Signed in as ${cloudUser.displayName||cloudUser.username}`);
       clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,Number(cloudConfig.pollMs||10000));
       updateCloudSettingsCard();
-    }catch(err){tfLogError("Connecting to shared workspace failed",err);cloudReady=false;clearCloudToken();showAuthGate(err.message||"Sign in to TeamFlow");setSyncStatus("error","Sync · sign in required",String(err?.message||err));}
+    }catch(err){
+      tfLogError("Connecting to shared workspace failed",err);cloudReady=false;
+      if(isExpiredSessionError(err)){clearCloudToken();showAuthGate("Your session expired. Sign in again.");setSyncStatus("error","Sync · sign in required",String(err?.message||err));}
+      else if(isTransientServiceError(err)){hideAuthGate();handleTemporaryServiceFailure(err,"Connection");}
+      else{showAuthGate(err.message||"Sign in to TeamFlow");setSyncStatus("error","Sync · connection failed",String(err?.message||err));}
+    }
   }
   async function runCloudSyncCheck(){
     ensureSyncBadge();setSyncStatus("connecting","Sync · checking…");
