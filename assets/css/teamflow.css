@@ -1938,3 +1938,30 @@ html[data-theme="dark"] .ticket-editor-modal .editor-semantic-select{color:inher
 .editor-collab-menu.editor-collab-floating .editor-collab-search-wrap{order:2;border-top:1px solid var(--border);border-bottom:0;background:var(--panel);padding:9px}
 .editor-collab-menu.editor-collab-floating .editor-collab-search-wrap input{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 8%,transparent)}
 .editor-collab-trigger[aria-expanded="true"]{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 10%,transparent)}
+
+
+/* ===== Mentions + comments polish ===== */
+.detail-assignee .member-avatar,.detail-assignee .member-avatar *{color:#fff!important}
+.detail-comment-compose textarea,.editor-comment-compose textarea,.comment-compose textarea,.rich-editor-body,
+.detail-comment-compose textarea:focus,.editor-comment-compose textarea:focus,.comment-compose textarea:focus{
+  color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;caret-color:var(--accent)!important
+}
+.detail-comment-compose textarea::placeholder,.editor-comment-compose textarea::placeholder,.comment-compose textarea::placeholder{color:var(--muted)!important;-webkit-text-fill-color:var(--muted)!important;opacity:.86}
+.ticket-editor-modal #pane-comments{min-height:0!important;padding:14px 16px 18px}
+.editor-comments-shell{max-width:880px;margin:0 auto;border:1px solid var(--border);border-radius:15px;background:var(--panel);padding:12px;box-shadow:0 5px 18px rgba(31,39,70,.045)}
+.editor-comments-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.editor-comments-head>div{display:flex;align-items:baseline;gap:8px}.editor-comments-head strong{font-size:calc(13px + var(--app-font-delta,0px))}.editor-comments-head small{color:var(--muted);font-size:calc(11px + var(--app-font-delta,0px))}
+.editor-comments-list{max-height:330px;overflow:auto;padding-right:2px;gap:7px}.editor-comments-empty{padding:22px!important;margin-bottom:2px}
+.editor-comment-card{display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;padding:9px 10px;border:1px solid var(--border);border-radius:11px;background:var(--panel-2)}
+.editor-comment-content{min-width:0}.editor-comment-card .comment-body{margin:4px 0 0;font-size:calc(12px + var(--app-font-delta,0px));line-height:1.45;color:var(--text)}
+.editor-comment-compose{display:grid;grid-template-columns:34px minmax(0,1fr) 36px;gap:8px;align-items:center;margin-top:10px;padding:7px 8px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2)}
+.editor-comment-compose .compose-avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:950;background:linear-gradient(145deg,var(--member-color,var(--accent)),color-mix(in srgb,var(--member-color,var(--accent)) 68%,#111827))}
+.editor-comment-compose textarea{min-height:38px!important;max-height:96px!important;height:38px;border:0!important;box-shadow:none!important;background:transparent!important;padding:8px 3px!important;resize:none;line-height:1.35;overflow:auto}
+.editor-comment-send{width:36px;height:36px;border:0;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;display:grid;place-items:center;box-shadow:0 7px 15px rgba(111,76,255,.24)}
+.editor-comment-send:hover{transform:translateY(-1px);box-shadow:0 10px 20px rgba(111,76,255,.3)}.editor-comment-send svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.rich-editor-body{color:var(--text)!important;-webkit-text-fill-color:var(--text)!important}.rich-editor-body:empty:before{color:var(--muted)!important}
+.rich-mention-menu{z-index:40000!important}
+.notification-comment-focus,.notification-document-focus{animation:notificationDeepFocus 3.6s ease both}
+@keyframes notificationDeepFocus{0%,100%{box-shadow:inherit}12%,70%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 62%,transparent),0 16px 40px color-mix(in srgb,var(--accent) 18%,transparent);background-color:color-mix(in srgb,var(--accent) 8%,var(--panel))}}
+.notification-kind.kind-mention{background:color-mix(in srgb,var(--accent) 12%,var(--panel));color:var(--accent)}
+[data-theme="dark"] .editor-comments-shell,[data-theme="dark"] .editor-comment-card,[data-theme="dark"] .editor-comment-compose{background:var(--panel)!important}
+[data-theme="dark"] .detail-comment-compose textarea,[data-theme="dark"] .editor-comment-compose textarea,[data-theme="dark"] .comment-compose textarea,[data-theme="dark"] .rich-editor-body{color:var(--text)!important;-webkit-text-fill-color:var(--text)!important}

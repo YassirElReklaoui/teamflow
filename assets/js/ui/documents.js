@@ -36,7 +36,6 @@
           <div class="modal-body">
             <div class="form-grid">
               <div class="field full"><label>Page name *</label><input id="blankPageName" value="Project Notes" placeholder="e.g. SIT Release Notes" /></div>
-              <div class="field full"><label>Start with some content (optional)</label><textarea id="blankPageText" placeholder="Meeting notes, decisions, checklist, useful links..."></textarea></div>
               <div class="field full"><div class="note">This note stays inside TeamFlow and is saved with your local workspace/export. It does not create a SharePoint document.</div></div>
             </div>
           </div>
@@ -50,8 +49,7 @@
     $("#createBlankPage").addEventListener("click",()=>{
       const name=$("#blankPageName").value.trim();
       if(!name){$("#blankPageName").focus();toast("Page name is required");return;}
-      const text=$("#blankPageText").value;
-      addDocument({id:"d"+Date.now(),name,kind:"blank",text,richHtml:textToRichHtml(text)});
+      addDocument({id:"d"+Date.now(),name,kind:"blank",text:"",richHtml:""});
       close();switchView("documents");toast(`${name} created`);
     });
     setTimeout(()=>$("#blankPageName")?.select(),0);
@@ -275,6 +273,43 @@
     return template.innerHTML;
   }
 
+
+  function attachRichEditorMentions(editor,onCommit){
+    if(!editor||editor.dataset.richMentionsReady==='1')return;
+    editor.dataset.richMentionsReady='1';
+    const menu=document.createElement('div');menu.className='mention-menu mention-portal hidden rich-mention-menu';document.body.appendChild(menu);
+    let matches=[],active=0,context=null;
+    const hide=()=>{menu.classList.add('hidden');matches=[];context=null;};
+    const getContext=()=>{
+      const sel=window.getSelection();if(!sel||!sel.rangeCount||!sel.isCollapsed)return null;
+      const range=sel.getRangeAt(0);if(!editor.contains(range.startContainer))return null;
+      const node=range.startContainer;if(node.nodeType!==Node.TEXT_NODE)return null;
+      const before=(node.textContent||'').slice(0,range.startOffset);
+      const match=before.match(/(?:^|\s)@([^@\n]{0,80})$/);if(!match)return null;
+      return {node,start:range.startOffset-(match[1].length+1),end:range.startOffset,query:match[1].trim().toLowerCase(),range};
+    };
+    const position=()=>{
+      const sel=window.getSelection();if(!sel||!sel.rangeCount)return;const r=sel.getRangeAt(0).cloneRange();const rect=r.getBoundingClientRect();
+      const width=Math.min(360,window.innerWidth-24);menu.style.width=`${width}px`;menu.style.left=`${Math.max(12,Math.min(window.innerWidth-width-12,rect.left))}px`;menu.style.top=`${Math.min(window.innerHeight-250,rect.bottom+8)}px`;
+    };
+    const choose=member=>{
+      if(!context||!member)return;const range=document.createRange();range.setStart(context.node,context.start);range.setEnd(context.node,context.end);range.deleteContents();
+      const text=document.createTextNode(`@${member.name} `);range.insertNode(text);range.setStartAfter(text);range.collapse(true);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);hide();editor.focus();onCommit?.();
+    };
+    const render=()=>{
+      context=getContext();if(!context){hide();return;}
+      matches=(state.members||[]).filter(m=>!context.query||String(m.name||'').toLowerCase().includes(context.query)).slice(0,8);active=0;
+      if(!matches.length){hide();return;}
+      menu.innerHTML=matches.map((m,i)=>`<button class="mention-option ${i===0?'active':''}" type="button" data-rich-mention="${i}" style="--member-color:${esc(m.color||memberColor(m.name))}"><span class="mention-avatar">${esc(initials(m.name))}</span><span class="mention-copy"><strong>${esc(m.name)}</strong><small>${esc(m.role||'Team member')}</small></span></button>`).join('');
+      menu.classList.remove('hidden');position();menu.querySelectorAll('[data-rich-mention]').forEach(btn=>btn.addEventListener('pointerdown',e=>{e.preventDefault();choose(matches[Number(btn.dataset.richMention)]);}));
+    };
+    editor.addEventListener('input',render);
+    editor.addEventListener('keyup',e=>{if(!['ArrowUp','ArrowDown','Enter','Escape'].includes(e.key))render();});
+    editor.addEventListener('keydown',e=>{if(menu.classList.contains('hidden')||!matches.length)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();active=(active+(e.key==='ArrowDown'?1:-1)+matches.length)%matches.length;menu.querySelectorAll('.mention-option').forEach((b,i)=>b.classList.toggle('active',i===active));}else if(e.key==='Enter'){e.preventDefault();choose(matches[active]);}else if(e.key==='Escape'){e.preventDefault();hide();}});
+    editor.addEventListener('blur',()=>setTimeout(hide,160));
+    window.addEventListener('resize',()=>{if(!menu.classList.contains('hidden'))position();});
+  }
+
   function renderRichBlankEditor(doc,content){
     if(!doc.richHtml) doc.richHtml=textToRichHtml(doc.text||"");
     content.innerHTML=`<div class="blank-pad"><div class="rich-editor-shell">
@@ -339,6 +374,8 @@
       clearTimeout(saveTimer);
       saveTimer=setTimeout(()=>{saveState();saveStatus.textContent=storageAvailable?"Saved in TeamFlow":"Saved for this session";},450);
     };
+    attachRichEditorMentions(editor,persist);
+
     const exec=(cmd,value=null)=>{
       restoreRange();
       try{document.execCommand(cmd,false,value);}catch(_){ }

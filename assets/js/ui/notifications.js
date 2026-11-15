@@ -12,6 +12,7 @@
       created:'<circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/>',
       dependency:'<path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"/>',
       comment:'<path d="M4 5h16v11H9l-5 4V5Z"/>',
+      mention:'<path d="M12 4a8 8 0 1 0 5.7 13.6"/><path d="M16 8v5a3 3 0 0 1-6 0v-2a3 3 0 0 1 6 0v2"/>',
       documentation:'<path d="M6 3h8l4 4v14H6zM14 3v5h5M9 13h6M9 17h5"/>',
       updated:'<path d="M12 3a9 9 0 1 0 8.5 6M20 3v6h-6"/>'
     };
@@ -134,6 +135,26 @@
     if(!n.readAt)markNotificationsRead([n.id]);
     if(!n.target?.view){toast(n.title||'Notification');return;}
     closeNotificationDropdown();
+    if(n.target.view==='ticket'&&n.target.ticketId){
+      switchView('board');
+      if(typeof clearAllBoardFilters==='function')clearAllBoardFilters();
+      renderBoard();
+      setTimeout(()=>{
+        if(typeof openTicketDetails==='function')openTicketDetails(n.target.ticketId);
+        setTimeout(()=>{
+          if(n.target.tab==='comments')document.querySelector('[data-detail-nav="comments"]')?.click();
+          setTimeout(()=>highlightNotificationComment(n.target.commentId),80);
+        },80);
+      },70);
+      return;
+    }
+    if(n.target.view==='documents'&&n.target.documentId){
+      activeDocId=n.target.documentId;
+      switchView('documents');
+      if(typeof renderDocuments==='function')renderDocuments();
+      setTimeout(()=>highlightNotificationDocument(n.target.documentId),100);
+      return;
+    }
     if(n.target.view==='board'&&n.target.ticketId){
       switchView('board');
       if(typeof clearAllBoardFilters==='function')clearAllBoardFilters();
@@ -142,6 +163,25 @@
       return;
     }
     switchView(n.target.view);
+  }
+
+
+  function highlightNotificationComment(commentId){
+    if(!commentId)return;
+    const el=document.querySelector(`[data-comment-id="${CSS.escape(String(commentId))}"]`);
+    if(!el){toast('The mentioned comment is no longer available');return;}
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.classList.remove('notification-comment-focus');void el.offsetWidth;el.classList.add('notification-comment-focus');
+    setTimeout(()=>el.classList.remove('notification-comment-focus'),3600);
+  }
+
+  function highlightNotificationDocument(documentId){
+    const item=document.querySelector(`[data-doc-id="${CSS.escape(String(documentId))}"]`);
+    const target=document.querySelector('.rich-editor-shell')||document.getElementById('docViewer')||item;
+    item?.scrollIntoView({behavior:'smooth',block:'nearest'});
+    if(!target){toast('The mentioned document is no longer available');return;}
+    target.classList.remove('notification-document-focus');void target.offsetWidth;target.classList.add('notification-document-focus');
+    setTimeout(()=>target.classList.remove('notification-document-focus'),3600);
   }
 
   function highlightNotificationTicket(ticketId){

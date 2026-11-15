@@ -249,6 +249,11 @@
     `;
   }
 
+
+  function editorDraftCommentHtml(c){
+    return `<div class="editor-comment-card" data-comment-id="${esc(c.id||'')}"><span class="comment-avatar" style="--comment-color:${memberColor(c.by)}">${esc(initials(c.by))}</span><div class="editor-comment-content"><div class="comment-head"><strong>${esc(c.by)}</strong><small>${esc(c.at)}</small></div><p class="comment-body">${formatCommentText(c.text)}</p></div></div>`;
+  }
+
   function openTicketModal(ticketId=null,presetStatus="To be started"){
     if(ticketId){
       ticketDetailStack=[];
@@ -520,15 +525,17 @@
           </div>
           <div class="modal-body editor-modal-body">
             <div id="pane-details" class="tab-pane active">${ticketForm(draft)}</div>
-            <div id="pane-comments" class="tab-pane">
-              <div class="comments">
-                ${(draft.comments||[]).length
-                  ? draft.comments.map(c=>`<div class="comment"><div class="comment-head"><strong>${esc(c.by)}</strong><small>${esc(c.at)}</small></div><p class="comment-body">${formatCommentText(c.text)}</p></div>`).join("")
-                  : '<div class="empty">No comments yet</div>'}
-              </div>
-              <div class="comment-compose">
-                <textarea id="commentText" placeholder="Write a comment..."></textarea>
-                <button id="sendComment" class="btn primary" type="button">Send</button>
+            <div id="pane-comments" class="tab-pane editor-comments-pane">
+              <div class="editor-comments-shell">
+                <div class="editor-comments-head"><div><strong>Comments</strong><small>${(draft.comments||[]).length} comment${(draft.comments||[]).length===1?'':'s'}</small></div></div>
+                <div class="comments editor-comments-list">
+                  ${(draft.comments||[]).length ? draft.comments.map(editorDraftCommentHtml).join("") : '<div class="detail-empty editor-comments-empty">No comments yet</div>'}
+                </div>
+                <div class="editor-comment-compose" style="--member-color:${memberColor(state.currentMember)}">
+                  <span class="compose-avatar">${esc(initials(state.currentMember))}</span>
+                  <textarea id="commentText" rows="1" placeholder="Write a comment… Use @ to mention someone"></textarea>
+                  <button id="sendComment" class="editor-comment-send" type="button" aria-label="Add comment to draft"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 16 8-16 8 3-8-3-8Z"/><path d="M7 12h13"/></svg></button>
+                </div>
               </div>
             </div>
             <div id="pane-history" class="tab-pane">
@@ -715,7 +722,8 @@
       draft.history.unshift("Comment added");
       $("#commentText").value="";
       const commentsBox=$("#pane-comments .comments");
-      if(commentsBox)commentsBox.innerHTML=draft.comments.map(c=>`<div class="comment"><div class="comment-head"><strong>${esc(c.by)}</strong><small>${esc(c.at)}</small></div><p class="comment-body">${formatCommentText(c.text)}</p></div>`).join("");
+      if(commentsBox)commentsBox.innerHTML=draft.comments.map(editorDraftCommentHtml).join("");
+      const commentsMeta=$(".editor-comments-head small",$("#pane-comments"));if(commentsMeta)commentsMeta.textContent=`${draft.comments.length} comment${draft.comments.length===1?'':'s'}`;
       const commentTab=$('.tab[data-tab="comments"] span');if(commentTab)commentTab.textContent=`Comments (${draft.comments.length})`;
       toast("Comment added to draft — save the ticket to publish it");
     });
