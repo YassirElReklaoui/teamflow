@@ -427,18 +427,34 @@
     if(cloudSaving){cloudDirty=true;return false;}
     cloudSaving=true;cloudDirty=false;setSyncStatus("saving","Sync · saving…");
     try{
+      // IMPORTANT: ordinary workspace saves are NEVER allowed to redefine workflow configuration,
+      // even when the signed-in user is an administrator. Only saveWorkflowOrderDraft() may do that.
+      // Always read the latest server copy immediately before PUT and preserve its workflow settings.
+      const latest=await cloudRequest('/workspace');
+      const latestState=normalizeCloudState(latest.state);
+      const latestVersion=Number(latest.version||cloudVersion||0);
       let outgoing=serializableCloudState();
-      if(cloudUser?.role!=="admin"){
-        try{
-          const latestForSettings=await cloudRequest('/workspace');
-          const latestState=normalizeCloudState(latestForSettings.state);
-          const protectedOrder=(latestState.settings?.workflowOrder||latestState.workflowOrder||latestState.statuses||clone(DEFAULT_STATUSES)).slice();
-          outgoing.settings=outgoing.settings||{};outgoing.settings.workflowOrder=protectedOrder.slice();outgoing.workflowOrder=protectedOrder.slice();outgoing.statuses=protectedOrder.slice();
-          state.settings=state.settings||{};state.settings.workflowOrder=protectedOrder.slice();state.workflowOrder=protectedOrder.slice();state.statuses=protectedOrder.slice();
-        }catch(settingsErr){tfLogError('Could not refresh protected workflow settings before save',settingsErr);}
-      }
-      const result=await cloudRequest("/workspace",{method:"PUT",body:{version:cloudVersion,state:outgoing}});
-      cloudVersion=Number(result.version||cloudVersion+1);cloudLastStamp=result.updatedAt||new Date().toISOString();cloudLastError="";
+
+      const protectedOrder=(latestState.settings?.workflowOrder||latestState.workflowOrder||latestState.statuses||clone(DEFAULT_STATUSES)).slice();
+      outgoing.settings=outgoing.settings&&typeof outgoing.settings==='object'&&!Array.isArray(outgoing.settings)?outgoing.settings:{};
+      const latestSettings=latestState.settings&&typeof latestState.settings==='object'&&!Array.isArray(latestState.settings)?clone(latestState.settings):{};
+      outgoing.settings={...outgoing.settings,...latestSettings,workflowOrder:protectedOrder.slice()};
+      outgoing.workflowOrder=protectedOrder.slice();
+      outgoing.statuses=protectedOrder.slice();
+      outgoing.statusIcons=clone(latestState.statusIcons||{});
+      outgoing.wipLimits=clone(latestState.wipLimits||{});
+
+      // Keep the current browser aligned with the canonical server workflow configuration too.
+      state.settings=state.settings&&typeof state.settings==='object'&&!Array.isArray(state.settings)?state.settings:{};
+      state.settings={...state.settings,...latestSettings,workflowOrder:protectedOrder.slice()};
+      state.workflowOrder=protectedOrder.slice();
+      state.statuses=protectedOrder.slice();
+      state.statusIcons=clone(latestState.statusIcons||{});
+      state.wipLimits=clone(latestState.wipLimits||{});
+
+      tfLog('info','Ordinary save preserving server workflow settings',{user:cloudUser?.username||'',role:cloudUser?.role||'',version:latestVersion,order:protectedOrder});
+      const result=await cloudRequest("/workspace",{method:"PUT",body:{version:latestVersion,state:outgoing}});
+      cloudVersion=Number(result.version||latestVersion+1);cloudLastStamp=result.updatedAt||new Date().toISOString();cloudLastError="";
       setSyncStatus("saved","Sync · saved",`Version ${cloudVersion} · ${new Date(cloudLastStamp).toLocaleTimeString()}`);
       setTimeout(()=>{if(!cloudSaving)setSyncStatus("connected","Sync · connected");},1200);return true;
     }catch(err){
