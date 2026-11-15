@@ -92,7 +92,7 @@
     return {
       tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],documents:[],activity:[],favorites:[],recentTickets:[],
       theme:prefs.theme||"light",currentMember:"",savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},
-      fontSizeByMember:prefs.fontSizeByMember&&typeof prefs.fontSizeByMember==="object"?prefs.fontSizeByMember:{},statusIcons:{},timelinePrefs:prefs.timelinePrefs&&typeof prefs.timelinePrefs==="object"?prefs.timelinePrefs:{},workflowOrder:clone(DEFAULT_STATUSES)
+      fontSizeByMember:prefs.fontSizeByMember&&typeof prefs.fontSizeByMember==="object"?prefs.fontSizeByMember:{},statusIcons:{},timelinePrefs:prefs.timelinePrefs&&typeof prefs.timelinePrefs==="object"?prefs.timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES)},workflowOrder:clone(DEFAULT_STATUSES)
     };
   }
 
@@ -292,17 +292,16 @@
     if(!next.timelinePrefs||typeof next.timelinePrefs!=="object")next.timelinePrefs={};
     if(!next.wipLimits||typeof next.wipLimits!=="object")next.wipLimits={};
     if(!next.statusIcons||typeof next.statusIcons!=="object")next.statusIcons={};
-    // Reconcile the shared order during every remote load. workflowOrder is preferred when
-    // present; statuses is the compatibility copy. Both are normalized to the same sequence.
-    const remoteStatuses=next.statuses.slice();
-    const requestedOrder=Array.isArray(next.workflowOrder)&&next.workflowOrder.length?next.workflowOrder.slice():remoteStatuses.slice();
-    const reconciled=[];
-    const seenWorkflow=new Set();
-    requestedOrder.forEach(value=>{
-      const name=remoteStatuses.find(x=>String(x).toLowerCase()===String(value||"").trim().toLowerCase());
-      if(name&&!seenWorkflow.has(String(name).toLowerCase())){seenWorkflow.add(String(name).toLowerCase());reconciled.push(name);}
-    });
+    if(!next.settings||typeof next.settings!=="object"||Array.isArray(next.settings))next.settings={};
+    if(!Array.isArray(next.settings.workflowOrder)||!next.settings.workflowOrder.length){
+      next.settings.workflowOrder=Array.isArray(next.workflowOrder)&&next.workflowOrder.length?next.workflowOrder.slice():(Array.isArray(next.statuses)&&next.statuses.length?next.statuses.slice():clone(DEFAULT_STATUSES));
+    }
+    const remoteStatuses=Array.isArray(next.statuses)&&next.statuses.length?next.statuses.slice():clone(DEFAULT_STATUSES);
+    const requestedOrder=next.settings.workflowOrder.slice();
+    const reconciled=[];const seenWorkflow=new Set();
+    requestedOrder.forEach(value=>{const name=remoteStatuses.find(x=>String(x).toLowerCase()===String(value||"").trim().toLowerCase());if(name&&!seenWorkflow.has(String(name).toLowerCase())){seenWorkflow.add(String(name).toLowerCase());reconciled.push(name);}});
     remoteStatuses.forEach(name=>{if(!seenWorkflow.has(String(name).toLowerCase())){seenWorkflow.add(String(name).toLowerCase());reconciled.push(name);}});
+    next.settings.workflowOrder=reconciled.slice();
     next.workflowOrder=reconciled.slice();
     next.statuses=reconciled.slice();
     next.theme=next.theme||state.theme||"light";
@@ -349,8 +348,10 @@
   function serializableCloudState(){
     ensureSharedWorkflowOrder();
     const copy=clone(state);
-    copy.workflowOrder=(state.workflowOrder||[]).slice();
-    copy.statuses=(state.workflowOrder||state.statuses||[]).slice();
+    copy.settings=copy.settings&&typeof copy.settings==="object"?copy.settings:{};
+    copy.settings.workflowOrder=ensureSharedWorkflowOrder().slice();
+    copy.workflowOrder=copy.settings.workflowOrder.slice();
+    copy.statuses=copy.settings.workflowOrder.slice();
     copy.documents=(copy.documents||[]).filter(d=>d.kind!=="pdf-local").map(d=>{delete d.runtimeUrl;return d;});
     return copy;
   }
@@ -359,7 +360,17 @@
     if(cloudSaving){cloudDirty=true;return false;}
     cloudSaving=true;cloudDirty=false;setSyncStatus("saving","Sync · saving…");
     try{
-      const result=await cloudRequest("/workspace",{method:"PUT",body:{version:cloudVersion,state:serializableCloudState()}});
+      let outgoing=serializableCloudState();
+      if(cloudUser?.role!=="admin"){
+        try{
+          const latestForSettings=await cloudRequest('/workspace');
+          const latestState=normalizeCloudState(latestForSettings.state);
+          const protectedOrder=(latestState.settings?.workflowOrder||latestState.workflowOrder||latestState.statuses||clone(DEFAULT_STATUSES)).slice();
+          outgoing.settings=outgoing.settings||{};outgoing.settings.workflowOrder=protectedOrder.slice();outgoing.workflowOrder=protectedOrder.slice();outgoing.statuses=protectedOrder.slice();
+          state.settings=state.settings||{};state.settings.workflowOrder=protectedOrder.slice();state.workflowOrder=protectedOrder.slice();state.statuses=protectedOrder.slice();
+        }catch(settingsErr){tfLogError('Could not refresh protected workflow settings before save',settingsErr);}
+      }
+      const result=await cloudRequest("/workspace",{method:"PUT",body:{version:cloudVersion,state:outgoing}});
       cloudVersion=Number(result.version||cloudVersion+1);cloudLastStamp=result.updatedAt||new Date().toISOString();cloudLastError="";
       setSyncStatus("saved","Sync · saved",`Version ${cloudVersion} · ${new Date(cloudLastStamp).toLocaleTimeString()}`);
       setTimeout(()=>{if(!cloudSaving)setSyncStatus("connected","Sync · connected");},1200);return true;
@@ -403,7 +414,7 @@
     try{if(getCloudToken())await cloudRequest("/auth/logout",{method:"POST"});}catch(err){tfLogError("Logout request failed",err);}
     clearCloudToken();cloudUser=null;cloudReady=false;clearInterval(cloudPollTimer);state=emptySecureState();renderAfterSharedUpdate();showAuthGate("Signed out. Shared data was removed from this browser view.");setSyncStatus("connecting","Sync · sign in");
   }
-  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},workflowOrder:clone(DEFAULT_STATUSES)};}
+  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES)},workflowOrder:clone(DEFAULT_STATUSES)};}
 
   function updateCloudSettingsCard(){
     const apiEl=document.getElementById("cloudSettingsApi"),wsEl=document.getElementById("cloudSettingsWorkspace"),userEl=document.getElementById("cloudSettingsUser"),stateEl=document.getElementById("cloudSettingsState"),manage=document.getElementById("cloudManageUsers");
@@ -862,46 +873,42 @@
 
 
   function ensureSharedWorkflowOrder(){
-    // The workflow NAME is the identity and the array order is the single shared board order.
-    // Keep workflowOrder and statuses in the same order for backward compatibility so an
-    // older code path cannot restore a different column sequence during synchronization.
-    const canonicalRaw=Array.isArray(state.statuses)&&state.statuses.length?state.statuses.slice():clone(DEFAULT_STATUSES);
-    const canonical=[];
-    const seenCanonical=new Set();
-    canonicalRaw.forEach(value=>{
-      const name=String(value||"").trim();
-      const key=name.toLowerCase();
-      if(name&&!seenCanonical.has(key)){seenCanonical.add(key);canonical.push(name);}
-    });
-    let order=Array.isArray(state.workflowOrder)&&state.workflowOrder.length?state.workflowOrder.slice():canonical.slice();
-    const seenOrder=new Set();
-    order=order.map(value=>String(value||"").trim()).filter(name=>{
-      const canonicalName=canonical.find(x=>x.toLowerCase()===name.toLowerCase());
-      if(!canonicalName)return false;
-      const key=canonicalName.toLowerCase();
-      if(seenOrder.has(key))return false;
-      seenOrder.add(key);
-      return true;
-    }).map(name=>canonical.find(x=>x.toLowerCase()===name.toLowerCase()));
-    canonical.forEach(name=>{if(!seenOrder.has(name.toLowerCase())){seenOrder.add(name.toLowerCase());order.push(name);}});
+    if(!state.settings||typeof state.settings!=="object"||Array.isArray(state.settings))state.settings={};
+    const identities=Array.isArray(state.statuses)&&state.statuses.length?state.statuses.slice():clone(DEFAULT_STATUSES);
+    let order=Array.isArray(state.settings.workflowOrder)&&state.settings.workflowOrder.length?state.settings.workflowOrder.slice():(Array.isArray(state.workflowOrder)&&state.workflowOrder.length?state.workflowOrder.slice():identities.slice());
+    const identityByLower=new Map(identities.map(name=>[String(name).toLowerCase(),String(name)]));
+    const seen=new Set();
+    order=order.map(name=>identityByLower.get(String(name).toLowerCase())).filter(name=>{if(!name)return false;const k=name.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
+    identities.forEach(name=>{const k=String(name).toLowerCase();if(!seen.has(k)){order.push(String(name));seen.add(k);}});
+    state.settings.workflowOrder=order.slice();
     state.workflowOrder=order.slice();
     state.statuses=order.slice();
     return order.slice();
   }
 
-  function moveSharedWorkflow(statusName,direction){
-    if(cloudUser?.role!=="admin"){toast("Administrator access required");return false;}
-    const order=ensureSharedWorkflowOrder();
-    const index=order.indexOf(statusName);
-    if(index<0)return false;
-    const nextIndex=direction==='up'?index-1:direction==='down'?index+1:index;
-    if(nextIndex<0||nextIndex>=order.length||nextIndex===index)return false;
-    [order[index],order[nextIndex]]=[order[nextIndex],order[index]];
-    state.workflowOrder=order.slice();
-    state.statuses=order.slice();
-    saveState();
-    tfLog('info','Shared workflow order changed',{admin:cloudUser?.username||'',status:statusName,direction,order:[...order]});
+  async function persistSharedWorkflowOrder(order){
+    if(cloudUser?.role!=="admin")throw new Error("Administrator access required");
+    const desired=order.slice();
+    if(!cloudReady){state.settings=state.settings||{};state.settings.workflowOrder=desired.slice();state.workflowOrder=desired.slice();state.statuses=desired.slice();saveState();return true;}
+    tfLog('info','Persisting shared workflow order',{admin:cloudUser?.username||'',order:desired});
+    const latest=await cloudRequest('/workspace');
+    const remote=normalizeCloudState(latest.state);
+    remote.settings=remote.settings||{};remote.settings.workflowOrder=desired.slice();remote.workflowOrder=desired.slice();remote.statuses=desired.slice();
+    const result=await cloudRequest('/workspace',{method:'PUT',body:{version:Number(latest.version||0),state:remote}});
+    cloudVersion=Number(result.version||Number(latest.version||0)+1);cloudLastStamp=result.updatedAt||new Date().toISOString();
+    state.settings=state.settings||{};state.settings.workflowOrder=desired.slice();state.workflowOrder=desired.slice();state.statuses=desired.slice();
+    tfLog('info','Shared workflow order persisted',{version:cloudVersion,order:desired});
+    setSyncStatus('saved','Sync · saved',`Workflow order · version ${cloudVersion}`);
     return true;
+  }
+
+  async function moveSharedWorkflow(statusName,direction){
+    if(cloudUser?.role!=="admin"){toast("Administrator access required");return false;}
+    const previous=ensureSharedWorkflowOrder().slice();const order=previous.slice();const index=order.indexOf(statusName);if(index<0)return false;
+    const nextIndex=direction==='up'?index-1:direction==='down'?index+1:index;if(nextIndex<0||nextIndex>=order.length||nextIndex===index)return false;
+    [order[index],order[nextIndex]]=[order[nextIndex],order[index]];
+    state.settings.workflowOrder=order.slice();state.workflowOrder=order.slice();state.statuses=order.slice();renderStatusEditor();renderBoard();
+    try{await persistSharedWorkflowOrder(order);return true;}catch(err){state.settings.workflowOrder=previous.slice();state.workflowOrder=previous.slice();state.statuses=previous.slice();tfLogError('Shared workflow order save failed',err,{status:statusName,direction,order});renderStatusEditor();renderBoard();toast('Workflow order could not be saved — see Console');return false;}
   }
 
   function ensureAdvancedState(){
@@ -912,6 +919,8 @@
     if(!state.wipLimits || typeof state.wipLimits!=="object" || Array.isArray(state.wipLimits)) state.wipLimits={};
     if(!state.fontSizeByMember || typeof state.fontSizeByMember!=="object" || Array.isArray(state.fontSizeByMember)) state.fontSizeByMember={};
     if(!state.statusIcons || typeof state.statusIcons!=="object" || Array.isArray(state.statusIcons)) state.statusIcons={};
+    if(!state.settings||typeof state.settings!=="object"||Array.isArray(state.settings))state.settings={};
+    if(!Array.isArray(state.settings.workflowOrder))state.settings.workflowOrder=[];
     if(!Array.isArray(state.workflowOrder)) state.workflowOrder=[];
     if(!state.timelinePrefs || typeof state.timelinePrefs!=="object" || Array.isArray(state.timelinePrefs)) state.timelinePrefs={};
     const tp=state.timelinePrefs;
@@ -1624,8 +1633,9 @@
       </div>`;
     }).join("");
 
-    $$('[data-board-status-move]').forEach(btn=>btn.addEventListener('click',()=>{
-      if(moveSharedWorkflow(btn.dataset.boardStatus,btn.dataset.boardStatusMove)){renderStatusEditor();renderBoard();toast(`${btn.dataset.boardStatus} moved for everyone`);}
+    $$('[data-board-status-move]').forEach(btn=>btn.addEventListener('click',async()=>{
+      const ok=await moveSharedWorkflow(btn.dataset.boardStatus,btn.dataset.boardStatusMove);
+      if(ok)toast(`${btn.dataset.boardStatus} moved for everyone`);
     }));
     $$('[data-remove-status]').forEach(btn=>btn.addEventListener("click",()=>openRemoveWorkflowModal(Number(btn.dataset.removeStatus))));
     renderSettingsSummary();
@@ -1675,7 +1685,7 @@
         ticket.history.unshift(`Workflow "${workflow}" removed; moved to ${destination}`);
       });
       state.statuses.splice(index,1);
-      state.workflowOrder=ensureSharedWorkflowOrder().filter(name=>name!==workflow);
+      state.settings=state.settings||{};state.settings.workflowOrder=ensureSharedWorkflowOrder().filter(name=>name!==workflow);state.workflowOrder=state.settings.workflowOrder.slice();state.statuses=state.settings.workflowOrder.slice();
       if(state.statusIcons) delete state.statusIcons[workflow];
       ensureMyWorkPrefs();
       saveState();
@@ -3074,6 +3084,7 @@
       const existingPos=sharedOrder.indexOf(clean);if(existingPos>=0)sharedOrder.splice(existingPos,1);
       if(after==="__end__")sharedOrder.push(clean);
       else{const sharedAfter=sharedOrder.indexOf(after);sharedOrder.splice(sharedAfter>=0?sharedAfter+1:sharedOrder.length,0,clean);}
+      state.settings=state.settings||{};state.settings.workflowOrder=sharedOrder.slice();
       state.workflowOrder=sharedOrder.slice();
       state.statuses=sharedOrder.slice();
       if(!state.statusIcons||typeof state.statusIcons!=="object") state.statusIcons={};
@@ -3299,7 +3310,9 @@
       if(!Array.isArray(imported.tickets)||!Array.isArray(imported.members)||!Array.isArray(imported.statuses)) throw new Error("Invalid format");
       state={...state,...imported,documents:Array.isArray(imported.documents)?imported.documents:[]};
       if(!Array.isArray(state.releases)) state.releases=[];
-      if(!Array.isArray(state.workflowOrder)||!state.workflowOrder.length)state.workflowOrder=state.statuses.slice();
+      if(!state.settings||typeof state.settings!=="object"||Array.isArray(state.settings))state.settings={};
+      if(!Array.isArray(state.settings.workflowOrder)||!state.settings.workflowOrder.length)state.settings.workflowOrder=Array.isArray(state.workflowOrder)&&state.workflowOrder.length?state.workflowOrder.slice():state.statuses.slice();
+      state.workflowOrder=state.settings.workflowOrder.slice();state.statuses=state.settings.workflowOrder.slice();
       state.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.release)t.release=t.sprint||state.releases[0]||"";if(!t.risk)t.risk="None";if(!Array.isArray(t.dependencies))t.dependencies=[];});
       activeDocId=state.documents[0]?.id||null;ensureAdvancedState();
       saveState();setTheme(state.theme);renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderBackups();renderDocuments();renderOverview();renderTimeline();
@@ -3352,7 +3365,7 @@
     if(!ok)return;
     state={
       tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state.theme,currentMember:"",documents:[],
-      activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},wipLimits:{},fontSizeByMember:{},statusIcons:{},timelinePrefs:{},workflowOrder:clone(DEFAULT_STATUSES)
+      activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},wipLimits:{},fontSizeByMember:{},statusIcons:{},timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES)},workflowOrder:clone(DEFAULT_STATUSES)
     };
     activeDocId=null;
     try{localStorage.removeItem(BACKUP_KEY);}catch(_){}
