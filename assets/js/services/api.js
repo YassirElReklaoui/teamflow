@@ -255,8 +255,8 @@
     const username=String(cloudUser.username||"").trim().toLowerCase();
     let member=state.members.find(m=>String(m.authUsername||"").trim().toLowerCase()===username);
     let changed=false;
-    // Never guess a link from display name. Imported member identities such as
-    // Y.ELREKLAOUI remain stable until an administrator explicitly links them.
+    // Never guess a link from display name. Imported member identities remain stable
+    // until an administrator explicitly links them to an authenticated account.
     if(!member && state.members.length===0 && username){
       const displayName=String(cloudUser.displayName||cloudUser.username||"Team member").trim();
       member={id:`auth-${username}`,name:displayName,role:cloudUser.role==="admin"?"Administrator":"Team member",color:colorForName(displayName),authUsername:username};
