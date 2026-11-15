@@ -28,8 +28,8 @@
 
   // Supabase is used only as a realtime wake-up channel. Google Sheets remains
   // the authoritative TeamFlow datastore behind the Cloudflare Worker.
-  const TEAMFLOW_SUPABASE_URL="https://wmmfdrytltzofsebfoca.supabase.co";
-  const TEAMFLOW_SUPABASE_PUBLISHABLE_KEY="sb_publishable_-Yja73LytizjYuTkh4ShfA_MZcpNJjf";
+  let TEAMFLOW_SUPABASE_URL="";
+  let TEAMFLOW_SUPABASE_PUBLISHABLE_KEY="";
   const TEAMFLOW_REALTIME_EVENT="workspace.changed";
   let teamflowRealtimeClient=null;
   let teamflowRealtimeChannel=null;
@@ -40,6 +40,17 @@
 
   function teamflowRealtimeTopic(){
     return `teamflow:${String(cloudConfig.workspaceId||"default").trim()||"default"}`;
+  }
+
+  async function loadTeamFlowPublicConfig(){
+    const config=await cloudRequest("/public-config",{auth:false});
+    TEAMFLOW_SUPABASE_URL=String(config?.supabaseUrl||"").trim();
+    TEAMFLOW_SUPABASE_PUBLISHABLE_KEY=String(config?.supabasePublishableKey||"").trim();
+    if(config?.workspaceId&&!String(cloudConfig.workspaceId||"").trim())cloudConfig.workspaceId=String(config.workspaceId).trim();
+    if(!TEAMFLOW_SUPABASE_URL||!TEAMFLOW_SUPABASE_PUBLISHABLE_KEY){
+      throw new Error("Supabase realtime public configuration is incomplete");
+    }
+    return config;
   }
 
   async function stopTeamFlowRealtime(){
@@ -84,6 +95,7 @@
     teamflowRealtimeStarting=true;
     try{
       await stopTeamFlowRealtime();
+      if(!TEAMFLOW_SUPABASE_URL||!TEAMFLOW_SUPABASE_PUBLISHABLE_KEY)await loadTeamFlowPublicConfig();
       const createClient=window.supabase?.createClient;
       if(typeof createClient!=="function"){
         tfLogError("Supabase Realtime client unavailable",new Error("supabase-js was not loaded"));
