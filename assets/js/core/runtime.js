@@ -92,7 +92,7 @@
     return {
       tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],documents:[],activity:[],favorites:[],recentTickets:[],
       theme:prefs.theme||"light",currentMember:"",savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},
-      fontSizeByMember:prefs.fontSizeByMember&&typeof prefs.fontSizeByMember==="object"?prefs.fontSizeByMember:{},statusIcons:{},timelinePrefs:prefs.timelinePrefs&&typeof prefs.timelinePrefs==="object"?prefs.timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES)},workflowOrder:clone(DEFAULT_STATUSES)
+      fontSizeByMember:prefs.fontSizeByMember&&typeof prefs.fontSizeByMember==="object"?prefs.fontSizeByMember:{},statusIcons:{},timelinePrefs:prefs.timelinePrefs&&typeof prefs.timelinePrefs==="object"?prefs.timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES),workspaceName:"Team Workspace",ticketPrefix:"TASK",fallbackPollMinutes:5},workflowOrder:clone(DEFAULT_STATUSES)
     };
   }
 
@@ -145,7 +145,7 @@
   const TEAMFLOW_CLOUD_DEFAULTS = {
     apiBaseUrl: "",
     workspaceId: "",
-    pollMs: 10000
+    pollMs: 300000
   };
   const CLOUD_CONFIG_KEY = "teamflow-cloud-config-v1";
   const CLOUD_SESSION_KEY = "teamflow-cloud-session-v1";

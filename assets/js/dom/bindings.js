@@ -164,6 +164,17 @@
   $("#settingsMembersShortcut")?.addEventListener("click",()=>switchView("team"));
   $("#settingsArchiveShortcut")?.addEventListener("click",()=>switchView("archive"));
   $("#settingsBackupShortcut")?.addEventListener("click",async()=>{const btn=$("#settingsBackupShortcut");if(btn)btn.disabled=true;try{await createWorkspaceBackup('Manual backup');$(".backup-settings")?.scrollIntoView({behavior:"smooth",block:"center"});}finally{if(btn)btn.disabled=false;}});
+  $("#saveWorkspaceIdentity")?.addEventListener("click",()=>{
+    if(cloudUser?.role!=="admin"){toast("Administrator access required");return;}
+    const name=String($("#workspaceDisplayName")?.value||"").trim().slice(0,100);
+    const prefix=String($("#workspaceTicketPrefix")?.value||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,12);
+    const fallback=Number($("#workspaceFallbackPoll")?.value||5);
+    if(!name){toast("Workspace name is required");$("#workspaceDisplayName")?.focus();return;}
+    if(prefix.length<2){toast("Ticket prefix must contain 2–12 letters or numbers");$("#workspaceTicketPrefix")?.focus();return;}
+    if(![1,5,10,15].includes(fallback)){toast("Choose a valid fallback sync interval");return;}
+    ensureAdvancedState();state.settings.workspaceName=name;state.settings.ticketPrefix=prefix;state.settings.fallbackPollMinutes=fallback;
+    applyWorkspaceIdentity();restartCloudPolling();saveState();renderMemberSelects();toast("Workspace settings saved");
+  });
   $("#createBackupNow")?.addEventListener("click",async()=>{const btn=$("#createBackupNow");if(btn)btn.disabled=true;try{await createWorkspaceBackup('Manual backup');}finally{if(btn)btn.disabled=false;}});
 
   // Identity follows the authenticated TeamFlow account; there is no manual "Viewing as" switch.

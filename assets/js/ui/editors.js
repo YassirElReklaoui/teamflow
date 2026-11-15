@@ -60,11 +60,11 @@
   }
 
   function nextTicketId(){
-    const nums = state.tickets.map(t=>{
-      const match = String(t.id).match(/\d+/);
-      return match ? Number(match[0]) : 0;
-    });
-    return "GIS-" + String(Math.max(100,...nums)+1).padStart(3,"0");
+    const prefix=workspaceTicketPrefix();
+    const escaped=prefix.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const pattern=new RegExp(`^${escaped}-(\\d+)$`,'i');
+    const nums=(state.tickets||[]).map(t=>String(t.id||"").match(pattern)).filter(Boolean).map(match=>Number(match[1]||0));
+    return `${prefix}-` + String(Math.max(100,...nums)+1).padStart(3,"0");
   }
 
   function collaboratorChecks(selected){

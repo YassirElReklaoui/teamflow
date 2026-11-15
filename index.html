@@ -4,17 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
-  <title>TeamFlow — Global Investigation System</title>
-  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-settings-clearadmin-4" />
+  <title>TeamFlow — Team Workspace</title>
+  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-workspace-config-1" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-    <script src="./assets/js/services/api.js?v=20261115-public-config-1" defer></script>
-  <script src="./assets/js/core/runtime.js?v=20261115-settings-clearadmin-4" defer></script>
-  <script src="./assets/js/services/domain.js?v=20261115-settings-clearadmin-4" defer></script>
+    <script src="./assets/js/services/api.js?v=20261115-workspace-config-1" defer></script>
+  <script src="./assets/js/core/runtime.js?v=20261115-workspace-config-1" defer></script>
+  <script src="./assets/js/services/domain.js?v=20261115-workspace-config-1" defer></script>
   <script src="./assets/js/ui/views.js?v=20261115-settings-clearadmin-4" defer></script>
-  <script src="./assets/js/ui/editors.js?v=20261115-settings-clearadmin-4" defer></script>
+  <script src="./assets/js/ui/editors.js?v=20261115-workspace-config-1" defer></script>
   <script src="./assets/js/ui/documents.js?v=20261115-settings-clearadmin-4" defer></script>
   <script src="./assets/js/ui/notifications.js?v=20261115-settings-clearadmin-4" defer></script>
-  <script src="./assets/js/dom/bindings.js?v=20261115-settings-clearadmin-4" defer></script>
+  <script src="./assets/js/dom/bindings.js?v=20261115-workspace-config-1" defer></script>
   <script src="./assets/js/bootstrap.js?v=20261115-settings-clearadmin-4" defer></script>
 </head>
 <body>
@@ -53,7 +53,7 @@
 
   <main class="main">
     <header class="topbar">
-      <div class="breadcrumb">Global Investigation System [GIS 2] — DE</div>
+      <div class="breadcrumb" id="workspaceBreadcrumb">Team Workspace</div>
       <div class="search"><input id="globalSearch" type="search" name="teamflow-ticket-search" value="" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Search tickets, labels, assignees..." /></div>
       <button class="top-action command-btn" id="commandPaletteBtn" type="button" title="Command palette (Ctrl+K)">⌘K</button>
       <button class="theme-switch" id="themeToggle" type="button" title="Switch to dark mode" aria-label="Switch to dark mode">
@@ -336,6 +336,15 @@
             <div class="settings-summary" aria-hidden="true"><span><b id="settingsWorkflowCount">0</b> workflows</span><span><b id="settingsReleaseCount">0</b> releases</span><span><b id="settingsBackupCount">0</b> backups</span></div>
           </div>
           <div class="settings-grid">
+            <div class="setting settings-card settings-wide workspace-identity-settings">
+              <div class="setting-head settings-section-head"><span class="setting-icon blue settings-section-icon"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></svg></span><div><h3>Workspace identity</h3><p>Customize the workspace name, ticket numbering prefix and fallback synchronization interval.</p></div></div>
+              <div class="workspace-identity-grid">
+                <label class="workspace-config-field"><span>Workspace name</span><input id="workspaceDisplayName" class="control" maxlength="100" placeholder="e.g. Product Delivery Workspace" /></label>
+                <label class="workspace-config-field"><span>Ticket prefix</span><input id="workspaceTicketPrefix" class="control" maxlength="12" placeholder="e.g. TASK" /><small>2–12 letters or numbers. New tickets will look like TASK-101.</small></label>
+                <label class="workspace-config-field"><span>Fallback sync</span><select id="workspaceFallbackPoll" class="control" data-no-custom><option value="1">Every 1 minute</option><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option></select><small>Realtime remains primary. This only controls the safety polling interval.</small></label>
+              </div>
+              <div class="workspace-identity-actions"><span id="workspaceIdentityReadOnly" class="note hidden">Only administrators can change workspace identity.</span><button id="saveWorkspaceIdentity" class="btn primary" type="button">Save workspace settings</button></div>
+            </div>
             <div class="setting settings-card appearance-settings">
               <div class="setting-head settings-section-head"><span class="setting-icon purple settings-section-icon"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1.4a2.1 2.1 0 0 0 0-4.2h-1.1a2.3 2.3 0 0 1 0-4.6H16a5 5 0 0 0 5-5A4.2 4.2 0 0 0 16.8 3H12Z"/><circle cx="7.5" cy="9" r="1"/><circle cx="9" cy="6" r="1"/><circle cx="6.5" cy="13" r="1"/><circle cx="11.5" cy="5.2" r="1"/></svg></span><div><h3>Appearance</h3><p>Choose the workspace theme used on this browser.</p></div></div>
               <button class="theme-switch settings-theme-switch" id="settingsTheme" type="button" title="Switch theme" aria-label="Switch theme">

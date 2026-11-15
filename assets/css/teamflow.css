@@ -2380,3 +2380,8 @@ html,body,*{
 .workflow-settings .workflow-card-icon svg,.settings-workflow-icon svg,.workflow-card .workflow-card-icon svg{width:21px!important;height:21px!important}
 /* Local data is admin-only; JS toggles .is-non-admin on settingsView. */
 #settingsView.is-non-admin .local-settings{display:none!important}
+
+
+/* Workspace identity configuration */
+.workspace-identity-settings{background:linear-gradient(135deg,color-mix(in srgb,var(--accent-soft) 34%,var(--panel)),var(--panel));}
+.workspace-identity-grid{display:grid;grid-template-columns:1.5fr .8fr 1fr;gap:12px;margin-top:12px}.workspace-config-field{display:flex;flex-direction:column;gap:6px}.workspace-config-field>span{font-size:12px;font-weight:900;color:var(--text)}.workspace-config-field small{font-size:11px;color:var(--muted);line-height:1.35}.workspace-identity-actions{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:13px;padding-top:12px;border-top:1px solid var(--border)}.workspace-identity-settings input:disabled,.workspace-identity-settings select:disabled{opacity:.72;cursor:not-allowed;background:color-mix(in srgb,var(--panel) 85%,var(--border))}@media(max-width:900px){.workspace-identity-grid{grid-template-columns:1fr}.workspace-identity-actions{justify-content:flex-start}}

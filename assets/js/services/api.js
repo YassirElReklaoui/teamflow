@@ -336,6 +336,9 @@
     if(!next.statusIcons||typeof next.statusIcons!=="object"||Array.isArray(next.statusIcons))next.statusIcons={};
     if(!next.wipLimits||typeof next.wipLimits!=="object"||Array.isArray(next.wipLimits))next.wipLimits={};
     if(!next.settings||typeof next.settings!=="object"||Array.isArray(next.settings))next.settings={};
+    if(typeof next.settings.workspaceName!=="string"||!next.settings.workspaceName.trim())next.settings.workspaceName="Team Workspace";
+    const normalizedPrefix=String(next.settings.ticketPrefix||"TASK").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,12);next.settings.ticketPrefix=normalizedPrefix.length>=2?normalizedPrefix:"TASK";
+    const normalizedPoll=Number(next.settings.fallbackPollMinutes||5);next.settings.fallbackPollMinutes=[1,5,10,15].includes(normalizedPoll)?normalizedPoll:5;
     if(rawSettingsRows)next.settings.workflowRows=rawSettingsRows;
 
     if(orderedWorkflowSettings){
@@ -381,7 +384,7 @@
   }
 
   function renderAfterSharedUpdate(){
-    setTheme(state.theme);ensureMemberColors();ensureAdvancedState();normalizeWorkflowOrder();applyUserFontSize();renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderDocuments();renderOverview();renderTimeline();renderArchivedTickets();renderBackups();
+    setTheme(state.theme);ensureMemberColors();ensureAdvancedState();normalizeWorkflowOrder();applyWorkspaceIdentity();applyUserFontSize();restartCloudPolling();renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderDocuments();renderOverview();renderTimeline();renderArchivedTickets();renderBackups();
     if(activeView==="mywork")renderMyWork();if(activeView==="insights")renderInsights();syncCustomSelects();
   }
   async function loadRemoteWorkspace({quiet=false}={}){
@@ -476,6 +479,12 @@
         if(!bs.has(name)||oldIcon!==newIcon||String(oldWip)!==String(newWip))ops.push({type:'workflow.upsert',id,value:{name,icon:newIcon,wip:newWip}});
       });
       (before.statuses||[]).forEach(name=>{if(!as.has(name))ops.push({type:'workflow.delete',id:spHash(name)});});
+    }
+
+    if(cloudUser?.role==='admin'){
+      const settingFields=['workspaceName','ticketPrefix','fallbackPollMinutes'];
+      const settingChanges={};settingFields.forEach(k=>{if(!jsonEqual(before?.settings?.[k],after?.settings?.[k]))settingChanges[k]=clone(after?.settings?.[k]);});
+      if(Object.keys(settingChanges).length)ops.push({type:'settings.patch',changes:settingChanges});
     }
 
     const userFields=['theme','favorites','recentTickets','savedViewsByMember','myWorkPrefsByMember','fontSizeByMember','timelinePrefs'];
@@ -578,6 +587,13 @@
     }
   }
 
+  function restartCloudPolling(){
+    if(!cloudReady)return;
+    const minutes=typeof workspaceFallbackPollMinutes==='function'?workspaceFallbackPollMinutes():5;
+    const ms=Math.max(60000,Number(minutes||5)*60000);
+    clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,ms);
+  }
+
   async function pollCloud(){
     if(document.hidden||deltaSaving||cloudApplyingRemote||deltaDirty||!cloudReady)return;
     try{const info=await cloudRequest(`/changes?since=${encodeURIComponent(cloudVersion)}`);if(info.changed){const loaded=await loadRemoteWorkspace({quiet:true});if(loaded)window.teamFlowNotificationsOnVersionChanged?.(info);}}
@@ -595,7 +611,7 @@
       const loaded=await loadRemoteWorkspace({quiet:true});if(!loaded)throw new Error(cloudLastError||"Could not load workspace");
       if(cloudUser?.role==="admin")await loadBackups({quiet:true});
       setSyncStatus("connected","Sync · connected",`Signed in as ${cloudUser.displayName||cloudUser.username}`);
-      clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,300000);
+      restartCloudPolling();
       await startTeamFlowRealtime();
       updateCloudSettingsCard();
       window.teamFlowNotificationsOnConnected?.();
@@ -622,7 +638,7 @@
     try{if(getCloudToken())await cloudRequest("/auth/logout",{method:"POST"});}catch(err){tfLogError("Logout request failed",err);}
     await stopTeamFlowRealtime();clearCloudToken();cloudUser=null;cloudReady=false;clearInterval(cloudPollTimer);state=emptySecureState();renderAfterSharedUpdate();showAuthGate("Signed out. Shared data was removed from this browser view.");setSyncStatus("connecting","Sync · sign in");
   }
-  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],releaseMeta:{},theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES)},workflowOrder:clone(DEFAULT_STATUSES)};}
+  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],releaseMeta:{},theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES),workspaceName:"Team Workspace",ticketPrefix:"TASK",fallbackPollMinutes:5},workflowOrder:clone(DEFAULT_STATUSES)};}
 
   function updateCloudSettingsCard(){
     const apiEl=document.getElementById("cloudSettingsApi"),wsEl=document.getElementById("cloudSettingsWorkspace"),userEl=document.getElementById("cloudSettingsUser"),stateEl=document.getElementById("cloudSettingsState"),manage=document.getElementById("cloudManageUsers");
@@ -635,6 +651,10 @@
     [document.getElementById("addStatus"),document.getElementById("addWorkflowStep"),document.getElementById("settingsBackupShortcut"),document.getElementById("createBackupNow")].forEach(el=>{if(el)el.style.display=isAdmin?"inline-flex":"none";});
     const settingsView=document.getElementById("settingsView");if(settingsView)settingsView.classList.toggle("is-non-admin",!isAdmin);
     const localDataCard=document.querySelector("#settingsView .local-settings");if(localDataCard)localDataCard.style.display=isAdmin?"":"none";
+    const workspaceFields=[document.getElementById("workspaceDisplayName"),document.getElementById("workspaceTicketPrefix"),document.getElementById("workspaceFallbackPoll")];workspaceFields.forEach(el=>{if(el)el.disabled=!isAdmin;});
+    const workspaceSave=document.getElementById("saveWorkspaceIdentity");if(workspaceSave)workspaceSave.style.display=isAdmin?"inline-flex":"none";
+    const workspaceReadOnly=document.getElementById("workspaceIdentityReadOnly");if(workspaceReadOnly)workspaceReadOnly.classList.toggle("hidden",isAdmin);
+    applyWorkspaceIdentity();
     const nameInput=document.getElementById("newStatusName");if(nameInput)nameInput.disabled=!isAdmin;
   }
 

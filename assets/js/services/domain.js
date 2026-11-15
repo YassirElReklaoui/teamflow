@@ -465,6 +465,12 @@
     if(!state.fontSizeByMember || typeof state.fontSizeByMember!=="object" || Array.isArray(state.fontSizeByMember)) state.fontSizeByMember={};
     if(!state.statusIcons || typeof state.statusIcons!=="object" || Array.isArray(state.statusIcons)) state.statusIcons={};
     if(!state.settings||typeof state.settings!=="object"||Array.isArray(state.settings))state.settings={};
+    if(typeof state.settings.workspaceName!=="string"||!state.settings.workspaceName.trim())state.settings.workspaceName="Team Workspace";
+    state.settings.workspaceName=state.settings.workspaceName.trim().slice(0,100);
+    const cleanPrefix=String(state.settings.ticketPrefix||"TASK").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,12);
+    state.settings.ticketPrefix=cleanPrefix.length>=2?cleanPrefix:"TASK";
+    const pollMinutes=Number(state.settings.fallbackPollMinutes||5);
+    state.settings.fallbackPollMinutes=[1,5,10,15].includes(pollMinutes)?pollMinutes:5;
     if(!state.releaseMeta||typeof state.releaseMeta!=="object"||Array.isArray(state.releaseMeta))state.releaseMeta={};
     (state.releases||[]).forEach(name=>{if(!state.releaseMeta[name])state.releaseMeta[name]={visibility:"active"};if(!["active","hidden","archived"].includes(state.releaseMeta[name].visibility))state.releaseMeta[name].visibility="active";});
     if(!Array.isArray(state.settings.workflowOrder))state.settings.workflowOrder=[];
@@ -493,6 +499,20 @@
     });
     state.statuses.forEach(s=>{if(!(s in state.wipLimits)) state.wipLimits[s]="";});
     Object.keys(state.wipLimits).forEach(s=>{if(!state.statuses.includes(s)) delete state.wipLimits[s];});
+  }
+
+
+  function workspaceName(){ensureAdvancedState();return state.settings.workspaceName||"Team Workspace";}
+  function workspaceTicketPrefix(){ensureAdvancedState();return state.settings.ticketPrefix||"TASK";}
+  function workspaceFallbackPollMinutes(){ensureAdvancedState();return Number(state.settings.fallbackPollMinutes||5);}
+  function applyWorkspaceIdentity(){
+    ensureAdvancedState();
+    const name=workspaceName();
+    document.title=`TeamFlow — ${name}`;
+    const crumb=document.getElementById("workspaceBreadcrumb");if(crumb)crumb.textContent=name;
+    const nameInput=document.getElementById("workspaceDisplayName");if(nameInput&&document.activeElement!==nameInput)nameInput.value=name;
+    const prefixInput=document.getElementById("workspaceTicketPrefix");if(prefixInput&&document.activeElement!==prefixInput)prefixInput.value=workspaceTicketPrefix();
+    const poll=document.getElementById("workspaceFallbackPoll");if(poll)poll.value=String(workspaceFallbackPollMinutes());
   }
 
 
@@ -671,7 +691,11 @@
     let safe=esc(text||'');
     const names=state.members.map(m=>m.name).sort((a,b)=>b.length-a.length);
     names.forEach(name=>{const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');safe=safe.replace(new RegExp('@'+escaped,'gi'),m=>`<span class="mention">${m}</span>`);});
-    safe=safe.replace(/\b(GIS-\d+)\b/gi,'<span class="ticket-ref" data-comment-ticket="$1">$1</span>');
+    const ticketIds=(state.tickets||[]).map(t=>String(t.id||"").trim()).filter(Boolean).sort((a,b)=>b.length-a.length);
+    if(ticketIds.length){
+      const pattern=ticketIds.map(id=>id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|');
+      safe=safe.replace(new RegExp(`(${pattern})`,'g'),'<span class="ticket-ref" data-comment-ticket="$1">$1</span>');
+    }
     return safe.replace(/\n/g,'<br>');
   }
 
