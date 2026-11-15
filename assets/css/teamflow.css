@@ -2020,3 +2020,50 @@ html[data-theme="dark"] .ticket-editor-modal .editor-semantic-select{color:inher
 .editor-comment-compose textarea::placeholder{color:var(--muted)!important;-webkit-text-fill-color:var(--muted)!important}
 
 @media(max-width:760px){.detail-attachment-add{grid-template-columns:1fr}.rich-editor-mode{display:none}}
+
+
+/* ===== 2026-11-15 refined secondary ticket tab views ===== */
+.detail-modal[data-detail-view="comments"] .detail-body,
+.detail-modal[data-detail-view="attachments"] .detail-body,
+.detail-modal[data-detail-view="history"] .detail-body{padding:14px 20px 18px;background:linear-gradient(180deg,color-mix(in srgb,var(--panel-2) 48%,var(--panel)),var(--panel) 84px)}
+.detail-tab-toolbar{display:flex;align-items:center;gap:10px;min-height:38px;margin:0 0 10px;padding:0 2px}
+.detail-tab-count{display:inline-flex;align-items:center;min-height:28px;padding:5px 10px;border:1px solid color-mix(in srgb,var(--accent) 18%,var(--border));border-radius:999px;background:color-mix(in srgb,var(--accent) 6%,var(--panel));color:var(--text);font-size:12px;font-weight:900}
+.detail-tab-hint{color:var(--muted);font-size:12px}
+.detail-flat-content{padding-top:0!important}
+
+/* conversation */
+.detail-conversation-view .detail-comments-content{min-height:430px;max-height:560px;border:1px solid var(--border);border-radius:16px;background:var(--panel);overflow:hidden;box-shadow:0 8px 24px color-mix(in srgb,#111827 5%,transparent)}
+.detail-conversation-view .detail-comments-list{padding:8px 14px 4px!important;background:linear-gradient(180deg,color-mix(in srgb,var(--panel-2) 58%,var(--panel)),var(--panel) 72px)}
+.detail-conversation-view .comment{padding:11px 2px!important}
+.detail-conversation-view .detail-comment-compose{position:sticky;bottom:0;margin:0!important;padding:10px 12px!important;border:0!important;border-top:1px solid var(--border)!important;border-radius:0!important;box-shadow:0 -10px 24px color-mix(in srgb,var(--panel) 92%,transparent)!important}
+.detail-conversation-view .detail-comment-compose textarea{min-height:42px!important;max-height:120px!important}
+
+/* attachment cards */
+.detail-attachment-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.detail-attachment-card{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:11px;align-items:center;min-height:88px;padding:12px;border:1px solid var(--border);border-radius:14px;background:var(--panel);box-shadow:0 5px 15px color-mix(in srgb,#111827 4%,transparent);transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.detail-attachment-card:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--accent) 28%,var(--border));box-shadow:0 10px 24px color-mix(in srgb,var(--accent) 8%,transparent)}
+.detail-attachment-card-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 14%,var(--panel)),color-mix(in srgb,var(--accent) 7%,var(--panel)));color:var(--accent);font-size:18px;font-weight:900}
+.detail-attachment-card-copy{min-width:0;display:flex;flex-direction:column;gap:3px}
+.detail-attachment-card-copy strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detail-attachment-card-copy span{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detail-attachment-card-copy small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detail-attachment-card-actions{display:flex;align-items:center;gap:5px}
+.detail-attachment-open{min-height:32px;padding:6px 9px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));border-radius:9px;background:color-mix(in srgb,var(--accent) 6%,var(--panel));color:var(--accent);font-size:11px;font-weight:900}
+.detail-attachment-open:hover{background:color-mix(in srgb,var(--accent) 11%,var(--panel))}
+.detail-attachment-card .detail-attachment-remove{width:30px;height:30px}
+.detail-attachment-composer{margin-top:12px;padding:12px;border:1px dashed color-mix(in srgb,var(--accent) 24%,var(--border));border-radius:14px;background:color-mix(in srgb,var(--accent) 3%,var(--panel))}
+.detail-attachment-composer-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}.detail-attachment-composer-head span{font-size:12px;font-weight:900}.detail-attachment-composer-head small{color:var(--muted);font-size:11px}
+.detail-attachment-add{padding-top:0!important}
+
+/* history timeline */
+.detail-history-view .detail-history-list{position:relative;padding:4px 4px 4px 8px}
+.detail-history-view .detail-history-list:before{content:"";position:absolute;left:15px;top:10px;bottom:10px;width:1px;background:var(--border)}
+.detail-history-view .detail-history-item{position:relative;grid-template-columns:16px minmax(0,1fr);gap:12px;padding:11px 4px!important;border-bottom:0!important}
+.detail-history-view .detail-history-dot{z-index:1;width:10px;height:10px;margin-top:4px;border:2px solid var(--panel);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 15%,var(--panel));background:var(--accent)}
+.detail-history-copy{padding:9px 11px;border:1px solid var(--border);border-radius:11px;background:var(--panel);box-shadow:0 4px 12px color-mix(in srgb,#111827 3%,transparent);font-size:12px;line-height:1.45}
+
+.detail-empty-state-wide{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:190px;padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:14px;background:color-mix(in srgb,var(--panel-2) 45%,var(--panel))}
+.detail-empty-state-wide strong{margin-top:8px;color:var(--text);font-size:13px}.detail-empty-state-wide span{margin-top:4px;font-size:12px}.detail-empty-state-icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 10%,var(--panel));color:var(--accent);font-size:18px;font-weight:900}
+
+[data-theme="dark"] .detail-attachment-card,[data-theme="dark"] .detail-conversation-view .detail-comments-content,[data-theme="dark"] .detail-history-copy{background:var(--panel)}
+@media(max-width:760px){.detail-tab-hint{display:none}.detail-attachment-grid{grid-template-columns:1fr}.detail-attachment-card{grid-template-columns:38px minmax(0,1fr)}.detail-attachment-card-actions{grid-column:2;justify-content:flex-end}.detail-attachment-composer-head small{display:none}}
