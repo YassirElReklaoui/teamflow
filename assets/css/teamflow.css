@@ -1748,3 +1748,126 @@
 .app.sidebar-collapsed .quick-btn .quick-label,.app.sidebar-collapsed .quick-count,.app.sidebar-collapsed .side-title,.app.sidebar-collapsed .local-card,.app.sidebar-collapsed .sidebar-user-switcher,.app.sidebar-collapsed .view-as-avatar-menu{display:none!important}
 .app.sidebar-collapsed .quick-radio{display:block!important;width:18px!important;height:18px!important;min-width:18px!important;margin:0!important}
 .app.sidebar-collapsed .nav-btn.active{box-shadow:inset 3px 0 0 var(--accent)!important}
+
+/* 2026-11 Ticket editor — details-style two-column layout */
+.ticket-editor-modal{
+  width:min(1180px,calc(100vw - 28px));
+  max-width:1180px;
+  max-height:calc(100vh - 24px);
+  border-radius:20px;
+}
+.ticket-editor-modal .editor-modal-body{
+  padding:16px 18px 18px;
+  background:color-mix(in srgb,var(--panel-2) 44%,var(--panel));
+}
+.ticket-editor-modal #pane-details{min-height:0}
+.editor-detail-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.85fr) minmax(310px,.92fr);
+  gap:16px;
+  align-items:start;
+}
+.editor-primary-column,.editor-properties-column{display:flex;flex-direction:column;gap:14px;min-width:0}
+.editor-properties-column{position:relative}
+.editor-section-card,.editor-side-card{
+  border:1px solid color-mix(in srgb,var(--accent) 17%,var(--border));
+  border-radius:16px;
+  background:var(--panel);
+  box-shadow:0 8px 24px rgba(48,39,88,.035);
+}
+.editor-section-card{padding:14px 16px}
+.editor-side-card{padding:0;overflow:hidden}
+.editor-section-heading,.editor-side-heading{
+  display:flex;align-items:center;gap:8px;min-height:34px;
+  color:var(--text);font-weight:900;
+}
+.editor-section-heading{padding-bottom:10px;border-bottom:1px solid color-mix(in srgb,var(--border) 84%,transparent);margin-bottom:11px}
+.editor-section-meta,.editor-side-count{
+  margin-left:auto;font-size:11px;font-weight:900;color:var(--muted);
+  background:var(--panel-2);border:1px solid var(--border);border-radius:999px;padding:3px 8px
+}
+.editor-side-heading{padding:12px 14px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel-2) 58%,var(--panel)))}
+.editor-side-heading .editor-icon,.editor-section-heading .editor-icon{color:var(--accent)}
+.editor-title-field input{font-weight:850;font-size:1.05em!important}
+.ticket-editor-modal #ticketDescription{min-height:136px!important;line-height:1.55}
+
+.editor-assignee-card{padding-bottom:12px}
+.editor-assignee-control{
+  margin:12px 13px 0;display:flex;align-items:center;gap:10px;min-height:64px;padding:9px 10px;
+  border:1px solid var(--border);border-radius:12px;background:var(--panel-2)
+}
+.editor-assignee-avatar{
+  width:44px;height:44px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto;
+  background:var(--editor-member-color,#7c3aed);color:#fff;font-weight:950;font-size:12px;
+  box-shadow:0 8px 18px color-mix(in srgb,var(--editor-member-color,#7c3aed) 22%,transparent)
+}
+.editor-assignee-copy{min-width:0;flex:1;display:grid;gap:1px}
+.editor-assignee-copy small{font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:900;color:var(--muted)}
+.editor-assignee-copy select{
+  width:100%;border:0!important;background:transparent!important;box-shadow:none!important;min-height:30px!important;
+  padding:2px 22px 2px 0!important;font-weight:850!important;color:var(--text)!important
+}
+
+.editor-key-details{padding:5px 13px 2px}
+.editor-key-row{
+  display:grid;grid-template-columns:minmax(122px,1fr) minmax(130px,1.08fr);gap:10px;align-items:center;
+  min-height:44px;border-bottom:1px solid color-mix(in srgb,var(--border) 82%,transparent)
+}
+.editor-key-row:last-child{border-bottom:0}
+.editor-key-row>label{display:flex;align-items:center;gap:7px;min-width:0;font-size:.79em;font-weight:800;color:var(--muted)}
+.editor-key-row>label .editor-icon{color:var(--accent);flex:0 0 auto}
+.editor-key-row input,.editor-key-row select{
+  width:100%;min-height:34px!important;padding:6px 9px!important;border:1px solid var(--border)!important;border-radius:9px!important;
+  background:var(--panel)!important;font-size:.82em!important;font-weight:800!important;box-shadow:none!important
+}
+.editor-key-row-progress{display:block;padding:9px 0 10px}
+.editor-key-row-progress>label{margin-bottom:8px}
+.editor-side-progress{grid-template-columns:minmax(0,1fr) 62px!important;gap:8px!important}
+.editor-side-progress .progress-number{min-width:0}
+.editor-side-progress .progress-number input{padding:5px 3px!important;text-align:center}
+
+.editor-semantic-select{font-weight:900!important}
+.editor-semantic-select.semantic-status-done,.editor-semantic-select.semantic-status-deployed-on-sit{background:#edf9f0!important;border-color:#b9e9c5!important;color:#16763a!important}
+.editor-semantic-select.semantic-status-ongoing,.editor-semantic-select.semantic-status-code-review{background:#eef6ff!important;border-color:#c6ddfa!important;color:#1768aa!important}
+.editor-semantic-select.semantic-status-on-hold{background:#fff7e8!important;border-color:#f5d69b!important;color:#9a5a00!important}
+.editor-semantic-select.semantic-status-deprecated{background:#f2f4f7!important;border-color:#d5dae3!important;color:#596579!important}
+.editor-semantic-select.semantic-status-to-be-started{background:#f3efff!important;border-color:#d8cafe!important;color:#6941d9!important}
+.editor-semantic-select.semantic-priority-high{background:#fff0f0!important;border-color:#ffc7c7!important;color:#c62828!important}
+.editor-semantic-select.semantic-priority-medium{background:#fff5e9!important;border-color:#ffd3ae!important;color:#d85d00!important}
+.editor-semantic-select.semantic-priority-low{background:#eef9f2!important;border-color:#c8ead4!important;color:#237a45!important}
+.editor-semantic-select.semantic-risk-at-risk{background:#fff7e8!important;border-color:#f4d39a!important;color:#9a5a00!important}
+.editor-semantic-select.semantic-risk-blocked{background:#fff0f0!important;border-color:#ffc7c7!important;color:#c62828!important}
+.editor-semantic-select.semantic-risk-none{background:var(--panel-2)!important;color:var(--text)!important}
+
+.editor-blocker-field{padding:11px 13px 13px;border-top:1px solid var(--border)}
+.editor-blocker-field textarea{min-height:68px!important;resize:vertical}
+.editor-labels-card>.editor-field{padding:11px 13px 6px}
+.editor-label-preview{display:flex;flex-wrap:wrap;gap:6px;padding:0 13px 13px}
+.editor-label-chip{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900}
+.label-tone-0{background:#efe8ff;color:#6e35d9}.label-tone-1{background:#e5f5ff;color:#1470a8}.label-tone-2{background:#e8f8ec;color:#24733c}.label-tone-3{background:#fff3df;color:#a65d00}
+.editor-collaborator-card .editor-collab-grid{padding:11px 13px 13px;grid-template-columns:1fr}
+.editor-collaborator-card .editor-collab-grid .check{border-radius:10px;background:var(--panel-2)}
+.ticket-editor-modal .editor-card-template .editor-template-note{margin-top:10px}
+.ticket-editor-modal .editor-doc-footer{align-items:center}
+.ticket-editor-modal .editor-modal-actions{background:var(--panel);box-shadow:0 -8px 22px rgba(31,39,70,.04)}
+.ticket-editor-modal .editor-modal-actions .btn.primary{min-width:150px}
+
+html[data-theme="dark"] .ticket-editor-modal .editor-modal-body{background:color-mix(in srgb,var(--bg) 56%,var(--panel))}
+html[data-theme="dark"] .editor-section-card,html[data-theme="dark"] .editor-side-card{box-shadow:0 8px 24px rgba(0,0,0,.16)}
+html[data-theme="dark"] .editor-semantic-select.semantic-status-done,html[data-theme="dark"] .editor-semantic-select.semantic-status-deployed-on-sit{background:#173223!important;border-color:#285f3c!important;color:#72da91!important}
+html[data-theme="dark"] .editor-semantic-select.semantic-status-ongoing,html[data-theme="dark"] .editor-semantic-select.semantic-status-code-review{background:#172e43!important;border-color:#28506f!important;color:#7bc8ff!important}
+html[data-theme="dark"] .editor-semantic-select.semantic-status-on-hold,html[data-theme="dark"] .editor-semantic-select.semantic-priority-medium,html[data-theme="dark"] .editor-semantic-select.semantic-risk-at-risk{background:#352817!important;border-color:#68491e!important;color:#ffc36a!important}
+html[data-theme="dark"] .editor-semantic-select.semantic-status-to-be-started{background:#28203d!important;border-color:#514078!important;color:#bca8ff!important}
+html[data-theme="dark"] .editor-semantic-select.semantic-priority-high,html[data-theme="dark"] .editor-semantic-select.semantic-risk-blocked{background:#3a1d20!important;border-color:#713139!important;color:#ff9494!important}
+html[data-theme="dark"] .editor-semantic-select.semantic-priority-low{background:#173223!important;border-color:#285f3c!important;color:#72da91!important}
+
+@media(max-width:900px){
+  .editor-detail-layout{grid-template-columns:1fr}
+  .editor-properties-column{display:grid;grid-template-columns:1fr 1fr;align-items:start}
+  .editor-key-details-card{grid-column:1/-1}
+}
+@media(max-width:650px){
+  .editor-properties-column{display:flex}
+  .editor-key-row{grid-template-columns:1fr;gap:5px;padding:8px 0}
+  .editor-two,.editor-two-top{grid-template-columns:1fr!important;gap:10px!important}
+}
