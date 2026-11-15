@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
   <title>TeamFlow — Global Investigation System</title>
-  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-workflow-sidebar-1" />
-  <script src="./assets/js/teamflow.js?v=20261115-workflow-sidebar-1" defer></script>
+  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-settings-sidebar-2" />
+  <script src="./assets/js/teamflow.js?v=20261115-settings-sidebar-2" defer></script>
 </head>
 <body>
 <div class="app">
@@ -22,21 +22,21 @@
     </div>
 
     <nav class="nav-group" id="mainNav">
-      <button class="nav-btn active" data-view="overview" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/></svg></span> Overview</button>
-      <button class="nav-btn" data-view="board" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="9" rx="1.5"/><rect x="14" y="16" width="7" height="4" rx="1.5"/></svg></span> Board</button>
-      <button class="nav-btn" data-view="timeline" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg></span> Timeline</button>
-      <button class="nav-btn" data-view="mywork" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 12l2 2 4.5-4.5M8.5 18h7"/></svg></span> My Work</button>
-      <button class="nav-btn" data-view="insights" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-7"/><path d="M3 20h18"/></svg></span> Insights</button>
-      <button class="nav-btn" data-view="documents" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span> Documents / Pages</button>
-      <button class="nav-btn" data-view="team" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3.5 20c.4-4 2.2-6 5.5-6s5.1 2 5.5 6M14 15c3-.6 5.5.8 6.5 4"/></svg></span> Team</button>
-      <button class="nav-btn" data-view="settings" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7.3 7.3 0 0 0-.1-1l2-1.6-2-3.4-2.5 1a8 8 0 0 0-1.8-1L14.2 3h-4.1l-.4 2.9a8 8 0 0 0-1.8 1l-2.6-1-2 3.5 2.1 1.6a7.3 7.3 0 0 0 0 2L3.3 14.6l2 3.5 2.6-1a8 8 0 0 0 1.8 1l.4 2.9h4.1l.4-2.9a8 8 0 0 0 1.8-1l2.5 1 2-3.4-2-1.7c.1-.3.1-.7.1-1Z"/></svg></span> Settings</button>
+      <button class="nav-btn active" data-view="overview" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/></svg></span><span class="nav-label">Overview</span></button>
+      <button class="nav-btn" data-view="board" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="9" rx="1.5"/><rect x="14" y="16" width="7" height="4" rx="1.5"/></svg></span><span class="nav-label">Board</span></button>
+      <button class="nav-btn" data-view="timeline" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg></span><span class="nav-label">Timeline</span></button>
+      <button class="nav-btn" data-view="mywork" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 12l2 2 4.5-4.5M8.5 18h7"/></svg></span><span class="nav-label">My Work</span></button>
+      <button class="nav-btn" data-view="insights" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-7"/><path d="M3 20h18"/></svg></span><span class="nav-label">Insights</span></button>
+      <button class="nav-btn" data-view="documents" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="nav-label">Documents / Pages</span></button>
+      <button class="nav-btn" data-view="team" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3.5 20c.4-4 2.2-6 5.5-6s5.1 2 5.5 6M14 15c3-.6 5.5.8 6.5 4"/></svg></span><span class="nav-label">Team</span></button>
+      <button class="nav-btn" data-view="settings" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19 12a7.3 7.3 0 0 0-.1-1l2-1.6-2-3.4-2.5 1a8 8 0 0 0-1.8-1L14.2 3h-4.1l-.4 2.9a8 8 0 0 0-1.8 1l-2.6-1-2 3.5 2.1 1.6a7.3 7.3 0 0 0 0 2L3.3 14.6l2 3.5 2.6-1a8 8 0 0 0 1.8 1l.4 2.9h4.1l.4-2.9a8 8 0 0 0 1.8-1l2.5 1 2-3.4-2-1.7c.1-.3.1-.7.1-1Z"/></svg></span><span class="nav-label">Settings</span></button>
     </nav>
 
     <div class="side-title" id="quickFiltersTitle">Quick filters</div>
     <div class="nav-group">
-      <button class="quick-btn" data-quick="mine" type="button"><span class="quick-radio"></span><span>Assigned to me</span><span class="quick-count" id="mineCount">0</span></button>
-      <button class="quick-btn active" data-quick="clear" type="button"><span class="quick-radio"></span><span>All tickets</span><span class="quick-count" id="allCount">0</span></button>
-      <button class="quick-btn" data-quick="overdue" type="button"><span class="quick-radio"></span><span>Overdue</span><span class="quick-count" id="overdueCount">0</span></button>
+      <button class="quick-btn" data-quick="mine" type="button"><span class="quick-radio"></span><span class="quick-label">Assigned to me</span><span class="quick-count" id="mineCount">0</span></button>
+      <button class="quick-btn active" data-quick="clear" type="button"><span class="quick-radio"></span><span class="quick-label">All tickets</span><span class="quick-count" id="allCount">0</span></button>
+      <button class="quick-btn" data-quick="overdue" type="button"><span class="quick-radio"></span><span class="quick-label">Overdue</span><span class="quick-count" id="overdueCount">0</span></button>
     </div>
 
     <div class="side-spacer"></div>
