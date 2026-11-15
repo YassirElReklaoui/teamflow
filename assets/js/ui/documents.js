@@ -241,6 +241,9 @@
 
   function renderBackups(){
     const el=$("#backupList"); if(!el) return;
+    const isAdmin=cloudUser?.role==="admin";
+    const backupCard=el.closest('.backup-settings');if(backupCard)backupCard.style.display=isAdmin?'':'none';
+    if(!isAdmin){el.innerHTML='';return;}
     const backups=getBackups();
     el.innerHTML=backups.length?backups.map(b=>`<article class="backup-card">
       <div class="backup-card-icon">↶</div>

@@ -518,7 +518,8 @@
     if(stateEl)stateEl.textContent=cloudReady?`Connected · v${cloudVersion}`:"Disconnected";
     const isAdmin=cloudUser?.role==="admin";
     if(manage)manage.style.display=isAdmin?"inline-flex":"none";
-    [document.getElementById("addStatus"),document.getElementById("addWorkflowStep")].forEach(el=>{if(el)el.style.display=isAdmin?"inline-flex":"none";});
+    [document.getElementById("addStatus"),document.getElementById("addWorkflowStep"),document.getElementById("settingsBackupShortcut"),document.getElementById("createBackupNow")].forEach(el=>{if(el)el.style.display=isAdmin?"inline-flex":"none";});
+    const settingsView=document.getElementById("settingsView");if(settingsView)settingsView.classList.toggle("is-non-admin",!isAdmin);
     const nameInput=document.getElementById("newStatusName");if(nameInput)nameInput.disabled=!isAdmin;
   }
 

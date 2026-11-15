@@ -2321,3 +2321,45 @@ html,body,*{
 [data-theme="dark"] #settingsView .settings-access-actions .btn.danger{background:rgba(225,29,72,.12)!important;border-color:rgba(225,29,72,.25)!important;color:#fb7185!important}
 @media(max-width:1100px){#settingsView .settings-access-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}#settingsView .workflow-card-strip{grid-template-columns:repeat(3,minmax(150px,1fr))!important}}
 @media(max-width:720px){#settingsView .workflow-card-strip{grid-template-columns:repeat(2,minmax(140px,1fr))!important}#settingsView .settings-access-grid{grid-template-columns:1fr!important}#settingsView .workflow-head-actions{margin-left:0}.settings-section-head{flex-wrap:wrap}}
+
+
+/* ===== Settings reference layout correction v3 ===== */
+#settingsView #statusEditor.workflow-status-stage{display:block!important;width:100%!important;max-width:none!important;grid-template-columns:none!important;overflow:visible!important;padding:0!important;margin:0!important}
+#settingsView #statusEditor>.workflow-card-strip{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:12px!important;width:100%!important;max-width:none!important;overflow:visible!important;padding:2px 0 0!important;align-items:stretch!important}
+#settingsView .workflow-setting-card{min-width:0!important;max-width:none!important;width:100%!important;min-height:164px!important;display:flex!important;flex-direction:column!important;padding:14px 14px 0!important;border-radius:16px!important}
+#settingsView .workflow-setting-card .workflow-remove-action{margin-top:auto!important}
+#settingsView .workflow-order-savebar{width:100%!important;margin-top:12px!important}
+#settingsView .workflow-settings{overflow:visible!important}
+#settingsView .workflow-head-actions{margin-left:auto!important;display:flex!important;align-items:center!important;gap:10px!important}
+
+#settingsView .settings-section-icon{width:42px!important;height:42px!important;flex:0 0 42px!important;border-radius:13px!important;display:grid!important;place-items:center!important}
+#settingsView .settings-section-icon svg{width:20px!important;height:20px!important;fill:none!important;stroke:currentColor!important;stroke-width:1.9!important;stroke-linecap:round!important;stroke-linejoin:round!important}
+#settingsView .settings-section-icon.blue{background:#eaf5ff!important;color:#2f8df5!important}
+#settingsView .settings-section-icon.purple{background:#f0eaff!important;color:#6d4cff!important}
+#settingsView .settings-section-icon.amber{background:#fff2d8!important;color:#e99100!important}
+#settingsView .settings-section-icon.green{background:#e5faef!important;color:#0eaa68!important}
+#settingsView .settings-section-icon.teal{background:#e5faf7!important;color:#0f9f8d!important}
+#settingsView .settings-section-icon.red{background:#ffe9ed!important;color:#e11d48!important}
+[data-theme="dark"] #settingsView .settings-section-icon.blue{background:rgba(47,141,245,.15)!important;color:#79b9ff!important}
+[data-theme="dark"] #settingsView .settings-section-icon.purple{background:rgba(109,76,255,.16)!important;color:#ad98ff!important}
+[data-theme="dark"] #settingsView .settings-section-icon.amber{background:rgba(233,145,0,.15)!important;color:#f7bd57!important}
+[data-theme="dark"] #settingsView .settings-section-icon.green{background:rgba(14,170,104,.15)!important;color:#67d9a6!important}
+[data-theme="dark"] #settingsView .settings-section-icon.teal{background:rgba(15,159,141,.15)!important;color:#5bd0c0!important}
+[data-theme="dark"] #settingsView .settings-section-icon.red{background:rgba(225,29,72,.15)!important;color:#fb7185!important}
+
+#settingsView .settings-access-grid{display:grid!important;grid-template-columns:1.1fr 1.1fr 1.15fr 1.55fr 1.15fr!important;gap:10px!important;width:100%!important}
+#settingsView .access-tile{min-height:64px!important;padding:10px 12px!important;border:1px solid var(--border)!important;border-radius:13px!important;background:var(--panel)!important;display:grid!important;grid-template-columns:30px minmax(0,1fr)!important;gap:9px!important;align-items:center!important}
+#settingsView .access-tile>div{min-width:0!important}
+#settingsView .access-tile>div>span:first-child{display:block!important;font-size:9px!important;text-transform:uppercase!important;letter-spacing:.05em!important;color:var(--muted)!important;font-weight:900!important;margin-bottom:4px!important}
+#settingsView .access-tile b,#settingsView .access-tile code,#settingsView .access-tile>div>span:last-child{display:block!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:11px!important;color:var(--text)!important;font-weight:850!important}
+#settingsView .settings-access-actions{margin-top:10px!important;display:flex!important;gap:9px!important;align-items:center!important}
+
+@media(max-width:1320px){#settingsView #statusEditor>.workflow-card-strip{grid-template-columns:repeat(3,minmax(0,1fr))!important}#settingsView .settings-access-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:780px){#settingsView #statusEditor>.workflow-card-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:520px){#settingsView #statusEditor>.workflow-card-strip{grid-template-columns:1fr!important}}
+
+#settingsView.is-non-admin #settingsBackupShortcut,
+#settingsView.is-non-admin .backup-settings,
+#settingsView.is-non-admin #addStatus,
+#settingsView.is-non-admin .workflow-remove-action,
+#settingsView.is-non-admin .workflow-drag-handle{display:none!important}
