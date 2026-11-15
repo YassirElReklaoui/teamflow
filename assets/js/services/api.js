@@ -213,7 +213,7 @@
     const rawSettingsRows=Array.isArray(next.settings)?next.settings.slice():null;
     if(!Array.isArray(next.tickets))next.tickets=[];if(!Array.isArray(next.members))next.members=[];
     if(!Array.isArray(next.statuses)||!next.statuses.length)next.statuses=clone(DEFAULT_STATUSES);
-    if(!Array.isArray(next.releases))next.releases=[];if(!Array.isArray(next.documents))next.documents=[];
+    if(!Array.isArray(next.releases))next.releases=[];if(!next.releaseMeta||typeof next.releaseMeta!=="object"||Array.isArray(next.releaseMeta))next.releaseMeta={};if(!Array.isArray(next.documents))next.documents=[];
     if(!Array.isArray(next.activity))next.activity=[];if(!Array.isArray(next.favorites))next.favorites=[];if(!Array.isArray(next.recentTickets))next.recentTickets=[];
     if(!next.savedViewsByMember||typeof next.savedViewsByMember!=="object")next.savedViewsByMember={};
     if(!next.myWorkPrefsByMember||typeof next.myWorkPrefsByMember!=="object")next.myWorkPrefsByMember={};
@@ -247,7 +247,7 @@
     next.statuses=reconciled.slice();
     tfLog("info","Canonical workflow order after cloud normalization",{order:reconciled.slice(),source:orderedWorkflowSettings?.source||"workspace arrays"});
     next.theme=next.theme||state.theme||"light";
-    next.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.risk)t.risk="None";if(!t.blockerNote)t.blockerNote="";if(!Array.isArray(t.dependencies))t.dependencies=[];if(!Array.isArray(t.comments))t.comments=[];if(!Array.isArray(t.subtasks))t.subtasks=[];if(!Array.isArray(t.links))t.links=[];t.start=normalizeDate(t.start);t.end=normalizeDate(t.end);});
+    next.tickets.forEach(t=>{if(!t.type)t.type="Task";if(!t.risk)t.risk="None";if(!t.blockerNote)t.blockerNote="";if(!Array.isArray(t.dependencies))t.dependencies=[];if(!Array.isArray(t.comments))t.comments=[];if(!Array.isArray(t.subtasks))t.subtasks=[];if(!Array.isArray(t.links))t.links=[];if(typeof t.archived!=="boolean")t.archived=false;t.start=normalizeDate(t.start);t.end=normalizeDate(t.end);});
     return next;
   }
   function syncCurrentMemberToAuthenticatedUser(){
@@ -255,8 +255,8 @@
     const username=String(cloudUser.username||"").trim().toLowerCase();
     let member=state.members.find(m=>String(m.authUsername||"").trim().toLowerCase()===username);
     let changed=false;
-    // Never guess a link from display name. Imported member identities such as
-    // Y.ELREKLAOUI remain stable until an administrator explicitly links them.
+    // Never guess a link from display name. Imported member identities remain stable
+    // until an administrator explicitly links them to an authenticated account.
     if(!member && state.members.length===0 && username){
       const displayName=String(cloudUser.displayName||cloudUser.username||"Team member").trim();
       member={id:`auth-${username}`,name:displayName,role:cloudUser.role==="admin"?"Administrator":"Team member",color:colorForName(displayName),authUsername:username};
@@ -268,7 +268,7 @@
   }
 
   function renderAfterSharedUpdate(){
-    setTheme(state.theme);ensureMemberColors();ensureAdvancedState();normalizeWorkflowOrder();applyUserFontSize();renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderDocuments();renderOverview();renderTimeline();renderBackups();
+    setTheme(state.theme);ensureMemberColors();ensureAdvancedState();normalizeWorkflowOrder();applyUserFontSize();renderMemberSelects();renderBoard();renderTeam();renderStatusEditor();renderWipEditor();renderReleaseEditor();renderDocuments();renderOverview();renderTimeline();renderArchivedTickets();renderBackups();
     if(activeView==="mywork")renderMyWork();if(activeView==="insights")renderInsights();syncCustomSelects();
   }
   async function loadRemoteWorkspace({quiet=false}={}){
@@ -335,7 +335,16 @@
     bm.forEach((_,id)=>{if(!am.has(id))ops.push({type:'member.delete',id});});
 
     const br=mapBy(before.releases,(r,i)=>typeof r==='string'?spHash(r):(r.id||spHash(r.name||String(i)))), ar=mapBy(after.releases,(r,i)=>typeof r==='string'?spHash(r):(r.id||spHash(r.name||String(i))));
-    ar.forEach((r,id)=>{const value=typeof r==='string'?{name:r,order:(after.releases||[]).indexOf(r)}:r;if(!br.has(id)||!jsonEqual(typeof br.get(id)==='string'?{name:br.get(id),order:(before.releases||[]).indexOf(br.get(id))}:br.get(id),value))ops.push({type:'release.upsert',id,value});});
+    ar.forEach((r,id)=>{
+      const name=typeof r==='string'?r:r.name;
+      const meta=(after.releaseMeta&&after.releaseMeta[name])||{};
+      const value=typeof r==='string'?{name:r,order:(after.releases||[]).indexOf(r),visibility:meta.visibility||'active'}:{...r,visibility:r.visibility||meta.visibility||'active'};
+      const beforeRaw=br.get(id);
+      const beforeName=typeof beforeRaw==='string'?beforeRaw:beforeRaw?.name;
+      const beforeMeta=(before.releaseMeta&&before.releaseMeta[beforeName])||{};
+      const beforeValue=beforeRaw===undefined?undefined:(typeof beforeRaw==='string'?{name:beforeRaw,order:(before.releases||[]).indexOf(beforeRaw),visibility:beforeMeta.visibility||'active'}:{...beforeRaw,visibility:beforeRaw.visibility||beforeMeta.visibility||'active'});
+      if(!br.has(id)||!jsonEqual(beforeValue,value))ops.push({type:'release.upsert',id,value});
+    });
     br.forEach((_,id)=>{if(!ar.has(id))ops.push({type:'release.delete',id});});
 
     const bd=mapBy((before.documents||[]).filter(d=>d.kind!=='pdf-local'),d=>d.id||spHash(d.name||'')), ad=mapBy((after.documents||[]).filter(d=>d.kind!=='pdf-local'),d=>d.id||spHash(d.name||''));
@@ -419,9 +428,46 @@
     }
     deltaDirty=true;clearTimeout(deltaSaveTimer);deltaSaveTimer=setTimeout(()=>saveMinimalChanges(),450);
   }
+  async function bulkPatchTickets(ticketIds,changes){
+    const ids=[...new Set((ticketIds||[]).map(id=>String(id||'').trim()).filter(Boolean))];
+    const patch=Object.fromEntries(Object.entries(changes||{}).filter(([,v])=>v!==undefined));
+    if(!ids.length)throw new Error('Select at least one ticket');
+    if(!Object.keys(patch).length)throw new Error('Choose at least one field to update');
+    if(!cloudReady)throw Object.assign(new Error('TeamFlow is not connected'),{status:0});
+    setSyncStatus('saving','Sync · bulk updating…',`${ids.length} tickets`);
+    try{
+      tfLog('info','Sending one bulk ticket patch',{count:ids.length,fields:Object.keys(patch)});
+      const result=await cloudRequest('/tickets/bulk',{method:'PATCH',body:{ticketIds:ids,changes:patch}});
+      for(const ticket of (state.tickets||[])){
+        if(!ids.includes(String(ticket.id)))continue;
+        Object.assign(ticket,patch);
+        if(Object.prototype.hasOwnProperty.call(patch,'progress'))ticket.progress=normalizeProgress(patch.progress);
+      }
+      cloudVersion=Number(result.version||cloudVersion);
+      cloudLastStamp=result.updatedAt||new Date().toISOString();
+      cloudLastError='';
+      cloudBaselineState=clone(state);
+      deltaDirty=false;
+      setSyncStatus('saved','Sync · bulk saved',`${Number(result.updated||ids.length)} tickets · version ${cloudVersion}`);
+      setTimeout(()=>{if(!deltaSaving)setSyncStatus('connected','Sync · connected');},900);
+      return result;
+    }catch(err){
+      cloudLastError=String(err?.message||err);
+      tfLogError('Bulk ticket update failed',err,{count:ids.length,fields:Object.keys(patch)});
+      if(isExpiredSessionError(err)){
+        clearCloudToken();cloudReady=false;showAuthGate('Your session expired. Sign in again.');setSyncStatus('error','Sync · sign in required',cloudLastError);
+      }else if(isTransientServiceError(err)){
+        handleTemporaryServiceFailure(err,'Bulk update');
+      }else{
+        setSyncStatus('error','Sync · bulk update failed',cloudLastError);
+      }
+      throw err;
+    }
+  }
+
   async function pollCloud(){
     if(document.hidden||deltaSaving||cloudApplyingRemote||deltaDirty||!cloudReady)return;
-    try{const info=await cloudRequest(`/changes?since=${encodeURIComponent(cloudVersion)}`);if(info.changed)await loadRemoteWorkspace({quiet:true});}
+    try{const info=await cloudRequest(`/changes?since=${encodeURIComponent(cloudVersion)}`);if(info.changed){const loaded=await loadRemoteWorkspace({quiet:true});if(loaded)window.teamFlowNotificationsOnVersionChanged?.(info);}}
     catch(err){
       cloudLastError=String(err?.message||err);tfLogError("Cloud polling failed",err,{cloudVersion});
       if(isExpiredSessionError(err)){clearCloudToken();cloudReady=false;showAuthGate("Your session expired. Sign in again.");setSyncStatus("error","Sync · sign in required",cloudLastError);}
@@ -434,9 +480,11 @@
     try{
       const me=await cloudRequest("/auth/me");cloudUser=me.user;cloudReady=true;
       const loaded=await loadRemoteWorkspace({quiet:true});if(!loaded)throw new Error(cloudLastError||"Could not load workspace");
+      if(cloudUser?.role==="admin")await loadBackups({quiet:true});
       setSyncStatus("connected","Sync · connected",`Signed in as ${cloudUser.displayName||cloudUser.username}`);
       clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,Number(cloudConfig.pollMs||10000));
       updateCloudSettingsCard();
+      window.teamFlowNotificationsOnConnected?.();
     }catch(err){
       tfLogError("Connecting to shared workspace failed",err);cloudReady=false;
       if(isExpiredSessionError(err)){clearCloudToken();showAuthGate("Your session expired. Sign in again.");setSyncStatus("error","Sync · sign in required",String(err?.message||err));}
@@ -460,7 +508,7 @@
     try{if(getCloudToken())await cloudRequest("/auth/logout",{method:"POST"});}catch(err){tfLogError("Logout request failed",err);}
     clearCloudToken();cloudUser=null;cloudReady=false;clearInterval(cloudPollTimer);state=emptySecureState();renderAfterSharedUpdate();showAuthGate("Signed out. Shared data was removed from this browser view.");setSyncStatus("connecting","Sync · sign in");
   }
-  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES)},workflowOrder:clone(DEFAULT_STATUSES)};}
+  function emptySecureState(){return {tickets:[],members:[],statuses:clone(DEFAULT_STATUSES),releases:[],releaseMeta:{},theme:state?.theme||"light",currentMember:"",documents:[],activity:[],favorites:[],recentTickets:[],savedViewsByMember:{},myWorkPrefsByMember:{},wipLimits:{},fontSizeByMember:state?.fontSizeByMember||{},statusIcons:{},timelinePrefs:{},settings:{workflowOrder:clone(DEFAULT_STATUSES)},workflowOrder:clone(DEFAULT_STATUSES)};}
 
   function updateCloudSettingsCard(){
     const apiEl=document.getElementById("cloudSettingsApi"),wsEl=document.getElementById("cloudSettingsWorkspace"),userEl=document.getElementById("cloudSettingsUser"),stateEl=document.getElementById("cloudSettingsState"),manage=document.getElementById("cloudManageUsers");
@@ -468,7 +516,12 @@
     if(wsEl)wsEl.textContent=cloudConfig.workspaceId||"—";
     if(userEl)userEl.textContent=cloudUser?`${cloudUser.displayName||cloudUser.username} · ${cloudUser.role}`:"Signed out";
     if(stateEl)stateEl.textContent=cloudReady?`Connected · v${cloudVersion}`:"Disconnected";
-    if(manage)manage.style.display=cloudUser?.role==="admin"?"inline-flex":"none";
+    const isAdmin=cloudUser?.role==="admin";
+    if(manage)manage.style.display=isAdmin?"inline-flex":"none";
+    [document.getElementById("addStatus"),document.getElementById("addWorkflowStep"),document.getElementById("settingsBackupShortcut"),document.getElementById("createBackupNow")].forEach(el=>{if(el)el.style.display=isAdmin?"inline-flex":"none";});
+    const settingsView=document.getElementById("settingsView");if(settingsView)settingsView.classList.toggle("is-non-admin",!isAdmin);
+    const localDataCard=document.querySelector("#settingsView .local-settings");if(localDataCard)localDataCard.style.display=isAdmin?"":"none";
+    const nameInput=document.getElementById("newStatusName");if(nameInput)nameInput.disabled=!isAdmin;
   }
 
   async function openCloudUsersModal(options={}){
@@ -531,7 +584,31 @@
     document.addEventListener("visibilitychange",()=>{if(!document.hidden)pollCloud();});
   }
 
-  function getBackups(){return [];}
+  let serverBackups=[];
+  function getBackups(){return serverBackups;}
+  async function loadBackups({quiet=true}={}){
+    if(!cloudReady||cloudUser?.role!=="admin"){serverBackups=[];return serverBackups;}
+    try{const data=await cloudRequest('/admin/backups');serverBackups=Array.isArray(data.backups)?data.backups:[];return serverBackups;}
+    catch(err){if(!quiet)tfLogError('Loading backups failed',err);return serverBackups;}
+  }
+  async function createWorkspaceBackup(label='Manual backup'){
+    if(cloudUser?.role!=="admin"){toast('Administrator access required');return null;}
+    try{setSyncStatus('saving','Backup · creating…');const data=await cloudRequest('/admin/backups',{method:'POST',body:{label}});serverBackups=Array.isArray(data.backups)?data.backups:serverBackups;renderBackups();renderSettingsSummary();setSyncStatus('connected','Sync · connected');toast('Workspace backup created');return data.backup||null;}
+    catch(err){tfLogError('Creating workspace backup failed',err);setSyncStatus('error','Backup · failed',err.message);toast('Backup could not be created');return null;}
+  }
+  async function restoreWorkspaceBackup(id){
+    if(cloudUser?.role!=="admin")throw new Error('Administrator access required');
+    const result=await cloudRequest(`/admin/backups/${encodeURIComponent(id)}/restore`,{method:'POST'});
+    cloudVersion=Number(result.version||cloudVersion);cloudLastStamp=result.updatedAt||new Date().toISOString();
+    await loadRemoteWorkspace({quiet:true});await loadBackups({quiet:true});renderBackups();renderSettingsSummary();return result;
+  }
+  async function clearSharedWorkspace(){
+    if(cloudUser?.role!=="admin")throw Object.assign(new Error("Administrator access required"),{status:403});
+    const result=await cloudRequest('/admin/workspace',{method:'DELETE'});
+    cloudVersion=Number(result.version||cloudVersion);cloudLastStamp=result.updatedAt||new Date().toISOString();
+    await loadRemoteWorkspace({quiet:true});
+    return result;
+  }
   function rememberPreviousState(){/* Shared data is intentionally not persisted in browser storage. */}
   function saveState(){
     let localOk=true;
