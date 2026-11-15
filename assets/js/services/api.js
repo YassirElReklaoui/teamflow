@@ -34,6 +34,9 @@
   let teamflowRealtimeClient=null;
   let teamflowRealtimeChannel=null;
   let teamflowRealtimeRefreshTimer=0;
+  let teamflowRealtimeReconnectTimer=0;
+  let teamflowRealtimeSubscribed=false;
+  let teamflowRealtimeStarting=false;
 
   function teamflowRealtimeTopic(){
     return `teamflow:${String(cloudConfig.workspaceId||"default").trim()||"default"}`;
@@ -41,9 +44,20 @@
 
   async function stopTeamFlowRealtime(){
     clearTimeout(teamflowRealtimeRefreshTimer);teamflowRealtimeRefreshTimer=0;
+    clearTimeout(teamflowRealtimeReconnectTimer);teamflowRealtimeReconnectTimer=0;
+    teamflowRealtimeSubscribed=false;
     const client=teamflowRealtimeClient,channel=teamflowRealtimeChannel;
     teamflowRealtimeChannel=null;teamflowRealtimeClient=null;
     if(client&&channel){try{await client.removeChannel(channel);}catch(err){tfLogError("Supabase Realtime disconnect failed",err);}}
+  }
+
+  function scheduleTeamFlowRealtimeReconnect(delay=4000){
+    if(!cloudReady||!getCloudToken()||document.hidden)return;
+    clearTimeout(teamflowRealtimeReconnectTimer);
+    teamflowRealtimeReconnectTimer=setTimeout(()=>{
+      teamflowRealtimeReconnectTimer=0;
+      if(cloudReady&&!teamflowRealtimeSubscribed)startTeamFlowRealtime();
+    },delay);
   }
 
   function scheduleRealtimeWorkspaceRefresh(message){
@@ -66,32 +80,49 @@
   }
 
   async function startTeamFlowRealtime(){
-    await stopTeamFlowRealtime();
-    const createClient=window.supabase?.createClient;
-    if(typeof createClient!=="function"){
-      tfLogError("Supabase Realtime client unavailable",new Error("supabase-js was not loaded"));
-      return false;
-    }
+    if(teamflowRealtimeStarting)return false;
+    teamflowRealtimeStarting=true;
     try{
+      await stopTeamFlowRealtime();
+      const createClient=window.supabase?.createClient;
+      if(typeof createClient!=="function"){
+        tfLogError("Supabase Realtime client unavailable",new Error("supabase-js was not loaded"));
+        scheduleTeamFlowRealtimeReconnect(8000);
+        return false;
+      }
       teamflowRealtimeClient=createClient(TEAMFLOW_SUPABASE_URL,TEAMFLOW_SUPABASE_PUBLISHABLE_KEY,{
-        auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}
+        auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
+        realtime:{params:{log_level:"info"}}
       });
       const topic=teamflowRealtimeTopic();
       teamflowRealtimeChannel=teamflowRealtimeClient
-        .channel(topic)
+        .channel(topic,{config:{private:false,broadcast:{self:false}}})
         .on("broadcast",{event:TEAMFLOW_REALTIME_EVENT},message=>{
           tfLog("info","Supabase realtime workspace change received",{topic,version:Number(message?.payload?.version||0),currentVersion:cloudVersion});
           scheduleRealtimeWorkspaceRefresh(message);
         })
-        .subscribe(status=>{
-          if(status==="SUBSCRIBED")tfLog("info","Supabase realtime connected",{topic});
-          else if(status==="CHANNEL_ERROR"||status==="TIMED_OUT")tfLogError("Supabase realtime channel problem",new Error(status),{topic});
+        .subscribe((status,error)=>{
+          tfLog("info","Supabase realtime channel status",{topic,status,error:error?String(error?.message||error):""});
+          if(status==="SUBSCRIBED"){
+            teamflowRealtimeSubscribed=true;
+            clearTimeout(teamflowRealtimeReconnectTimer);teamflowRealtimeReconnectTimer=0;
+            tfLog("info","Supabase realtime connected",{topic});
+            return;
+          }
+          if(status==="CHANNEL_ERROR"||status==="TIMED_OUT"||status==="CLOSED"){
+            teamflowRealtimeSubscribed=false;
+            if(error)tfLogError("Supabase realtime channel problem",error,{topic,status});
+            else tfLogError("Supabase realtime channel problem",new Error(status),{topic});
+            scheduleTeamFlowRealtimeReconnect(status==="CLOSED"?5000:3500);
+          }
         });
       return true;
     }catch(err){
       tfLogError("Supabase Realtime startup failed",err);
-      await stopTeamFlowRealtime();
+      scheduleTeamFlowRealtimeReconnect(8000);
       return false;
+    }finally{
+      teamflowRealtimeStarting=false;
     }
   }
 
@@ -652,7 +683,13 @@
     const token=getCloudToken();
     if(!token){showAuthGate();if(apiConfigured())checkCloudHealth({quiet:true}).then(h=>setSetupMode(!!h.setupRequired)).catch(()=>{});return;}
     hideAuthGate();await connectCloudWorkspace();
-    document.addEventListener("visibilitychange",()=>{if(!document.hidden)pollCloud();});
+    document.addEventListener("visibilitychange",()=>{
+      if(!document.hidden){
+        if(!teamflowRealtimeSubscribed)startTeamFlowRealtime();
+        pollCloud();
+      }
+    });
+    window.addEventListener("online",()=>{if(cloudReady&&!teamflowRealtimeSubscribed)startTeamFlowRealtime();});
   }
 
   let serverBackups=[];
