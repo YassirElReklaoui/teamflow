@@ -294,7 +294,8 @@
     };
     const choose=member=>{
       if(!context||!member)return;const range=document.createRange();range.setStart(context.node,context.start);range.setEnd(context.node,context.end);range.deleteContents();
-      const text=document.createTextNode(`@${member.name} `);range.insertNode(text);range.setStartAfter(text);range.collapse(true);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);hide();editor.focus();onCommit?.();
+      const token=document.createElement('span');token.className='rich-mention-token';token.dataset.mentionName=member.name;token.contentEditable='false';token.textContent=`@${member.name}`;token.style.setProperty('--member-color',member.color||memberColor(member.name));
+      const spacer=document.createTextNode(' ');const fragment=document.createDocumentFragment();fragment.append(token,spacer);range.insertNode(fragment);range.setStartAfter(spacer);range.collapse(true);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range);hide();editor.focus();onCommit?.();
     };
     const render=()=>{
       context=getContext();if(!context){hide();return;}
@@ -344,14 +345,16 @@
         <div class="rich-link-actions"><button class="btn small" data-link-cancel type="button">Cancel</button><button class="btn primary small" data-link-apply type="button">Insert link</button></div>
       </div>
       <div class="rich-editor-body" contenteditable="true" spellcheck="true" data-rich-editor data-placeholder="Start typing your notes, decisions, documentation, or meeting summary…">${sanitizeRichHtml(doc.richHtml)}</div>
-      <div class="rich-editor-footer"><span class="rich-save-dot"></span><span data-save-status>Saved in TeamFlow</span><span style="margin-left:auto">Rich text · tables · links</span></div>
+      <div class="rich-editor-footer"><span class="rich-save-dot" data-save-dot></span><span data-save-status>Saved</span><span class="rich-editor-mode">Rich text · tables · links · @mentions</span><button class="btn primary small rich-document-save" data-document-save type="button" disabled>Save changes</button></div>
     </div></div>`;
 
     const shell=$(".rich-editor-shell",content);
     const editor=$("[data-rich-editor]",shell);
     const saveStatus=$("[data-save-status]",shell);
+    const saveButton=$("[data-document-save]",shell);
+    const saveDot=$("[data-save-dot]",shell);
     let lastRange=null;
-    let saveTimer=null;
+    let dirty=false;
 
     const captureRange=()=>{
       const sel=window.getSelection();
@@ -366,20 +369,19 @@
       sel.removeAllRanges();
       sel.addRange(lastRange);
     };
-    const persist=()=>{
-      doc.richHtml=sanitizeRichHtml(editor.innerHTML);
-      doc.text=editor.innerText;
-      doc.updatedAt=new Date().toISOString();
-      saveStatus.textContent="Saving…";
-      clearTimeout(saveTimer);
-      saveTimer=setTimeout(()=>{saveState();saveStatus.textContent=storageAvailable?"Saved in TeamFlow":"Saved for this session";},450);
+    const markDirty=()=>{
+      if(dirty)return;dirty=true;saveStatus.textContent="Unsaved changes";saveButton.disabled=false;shell.classList.add('has-unsaved-changes');saveDot?.classList.add('unsaved');
     };
-    attachRichEditorMentions(editor,persist);
+    const saveDocument=()=>{
+      if(!dirty)return;doc.richHtml=sanitizeRichHtml(editor.innerHTML);doc.text=editor.innerText;doc.updatedAt=new Date().toISOString();saveState();dirty=false;saveStatus.textContent="Saved";saveButton.disabled=true;shell.classList.remove('has-unsaved-changes');saveDot?.classList.remove('unsaved');toast(`${doc.name} saved`);
+    };
+    saveButton.addEventListener('click',saveDocument);
+    attachRichEditorMentions(editor,markDirty);
 
     const exec=(cmd,value=null)=>{
       restoreRange();
       try{document.execCommand(cmd,false,value);}catch(_){ }
-      captureRange();persist();
+      captureRange();markDirty();
     };
     const currentCell=()=>{
       const node=lastRange?.startContainer || window.getSelection()?.anchorNode;
@@ -387,11 +389,11 @@
       return el?.closest?.("td,th") || null;
     };
 
-    editor.addEventListener("input",persist);
+    editor.addEventListener("input",markDirty);
     editor.addEventListener("mouseup",captureRange);
     editor.addEventListener("keyup",captureRange);
     editor.addEventListener("focus",captureRange);
-    editor.addEventListener("paste",()=>setTimeout(()=>{doc.richHtml=sanitizeRichHtml(editor.innerHTML);editor.innerHTML=doc.richHtml;persist();},0));
+    editor.addEventListener("paste",()=>setTimeout(()=>{editor.innerHTML=sanitizeRichHtml(editor.innerHTML);captureRange();markDirty();},0));
     editor.addEventListener("click",e=>{
       const link=e.target.closest?.("a");
       if(!link || !editor.contains(link)) return;
@@ -437,7 +439,7 @@
       }else{
         document.execCommand("insertHTML",false,`<a href="${esc(valid)}" target="_blank" rel="noopener noreferrer">${esc(label||valid)}</a>`);
       }
-      linkPop.classList.add("hidden");captureRange();persist();
+      linkPop.classList.add("hidden");captureRange();markDirty();
     });
 
     const tableMenu=$("[data-table-menu]",shell);
@@ -466,7 +468,7 @@
           if(row.cells.length<=1)table.remove();else [...table.rows].forEach(r=>{if(r.cells[index])r.deleteCell(index);});
         }else if(action==="delete-table") table.remove();
       }
-      tableMenu.classList.add("hidden");captureRange();persist();
+      tableMenu.classList.add("hidden");captureRange();markDirty();
     }));
   }
 

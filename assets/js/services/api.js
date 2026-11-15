@@ -421,7 +421,7 @@
   }
   async function pollCloud(){
     if(document.hidden||deltaSaving||cloudApplyingRemote||deltaDirty||!cloudReady)return;
-    try{const info=await cloudRequest(`/changes?since=${encodeURIComponent(cloudVersion)}`);if(info.changed)await loadRemoteWorkspace({quiet:true});}
+    try{const info=await cloudRequest(`/changes?since=${encodeURIComponent(cloudVersion)}`);if(info.changed){const loaded=await loadRemoteWorkspace({quiet:true});if(loaded)window.teamFlowNotificationsOnVersionChanged?.(info);}}
     catch(err){
       cloudLastError=String(err?.message||err);tfLogError("Cloud polling failed",err,{cloudVersion});
       if(isExpiredSessionError(err)){clearCloudToken();cloudReady=false;showAuthGate("Your session expired. Sign in again.");setSyncStatus("error","Sync · sign in required",cloudLastError);}
@@ -437,6 +437,7 @@
       setSyncStatus("connected","Sync · connected",`Signed in as ${cloudUser.displayName||cloudUser.username}`);
       clearInterval(cloudPollTimer);cloudPollTimer=setInterval(pollCloud,Number(cloudConfig.pollMs||10000));
       updateCloudSettingsCard();
+      window.teamFlowNotificationsOnConnected?.();
     }catch(err){
       tfLogError("Connecting to shared workspace failed",err);cloudReady=false;
       if(isExpiredSessionError(err)){clearCloudToken();showAuthGate("Your session expired. Sign in again.");setSyncStatus("error","Sync · sign in required",String(err?.message||err));}

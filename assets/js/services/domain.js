@@ -668,7 +668,7 @@
   function openCommentEditModal(ticketId,commentId){
     const ticket=state.tickets.find(t=>t.id===ticketId);const c=ticket?.comments?.find(x=>x.id===commentId);if(!c)return;
     $("#confirmRoot").innerHTML=`<div class="notice-backdrop" role="dialog" aria-modal="true"><div class="notice-dialog"><div class="notice-hero"><div class="notice-icon">✎</div><div><h2>Edit comment</h2><p>Update your comment text.</p></div></div><div class="notice-body"><div class="field"><label>Comment</label><textarea id="editCommentText" style="min-height:120px">${esc(c.text)}</textarea></div></div><div class="notice-actions"><button class="btn" id="editCommentCancel" type="button">Cancel</button><button class="btn primary" id="editCommentSave" type="button">Save</button></div></div></div>`;
-    const close=()=>$("#confirmRoot").innerHTML="";$("#editCommentCancel").onclick=close;attachMentionAutocomplete($("#editCommentText"));$("#editCommentSave").onclick=()=>{const text=$("#editCommentText").value.trim();if(!text)return;c.text=text;c.at=nowLabel()+' · edited';logActivity('comment',ticket,'Edited a comment');saveState();close();openTicketDetails(ticketId,{preserveStack:true});};
+    const close=()=>$("#confirmRoot").innerHTML="";$("#editCommentCancel").onclick=close;attachMentionAutocomplete($("#editCommentText"));$("#editCommentSave").onclick=()=>{const text=$("#editCommentText").value.trim();if(!text)return;c.text=text;c.at=nowLabel()+' · edited';logActivity('comment',ticket,'Edited a comment');saveState();close();openTicketDetails(ticketId,{preserveStack:true,activeTab:'comments'});};
   }
 
   function openImportDiagnostics(stats){

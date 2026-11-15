@@ -276,6 +276,7 @@
 
   function openTicketDetails(ticketId,options={}){
     if(!options.preserveStack) ticketDetailStack=[];
+    const initialDetailTab=options.activeTab||"details";
     const t=state.tickets.find(x=>x.id===ticketId);
     if(!t) return;
     ensureAdvancedState();rememberRecent(ticketId);
@@ -376,19 +377,22 @@
                 <div class="detail-section-content"><div class="detail-relation-note">These downstream tickets list ${esc(t.id)} as a dependency.</div><div class="detail-deps">${downstream.length?downstream.map(d=>`<button class="detail-dependency" data-detail-ticket="${esc(d.id)}" type="button"><span class="dependency-state ${["Done","Deployed on SIT","Deprecated"].includes(d.status)?"done":"open"}"></span><span><b>${esc(d.id)}</b><strong>${esc(d.title)}</strong><small>${esc(d.status)} · ${normalizeProgress(d.progress)}%</small></span></button>`).join(""):'<div class="detail-empty detail-empty-with-icon"><span class="detail-empty-icon">⌘</span><span>No tickets currently depend on this one</span></div>'}</div></div>
               </section>
 
-              <section class="detail-section" id="detailDocsSection">
-                <button class="detail-section-head" data-detail-collapse type="button"><span class="detail-section-icon">${dIcons.docs}</span><h3>Attachments & Documentation</h3><span class="section-count">${docs.length}</span><span class="detail-chevron">${dIcons.chevron}</span></button>
-                <div class="detail-section-content"><div class="detail-docs">${docs.length?docs.map((d,i)=>`<button class="detail-doc" data-doc-index="${i}" type="button"><span class="detail-doc-icon">↗</span><span><strong>${esc(d.title||"Documentation")}</strong><small>${esc(d.chapter||"Open reference")}</small></span></button>`).join(""):'<button class="detail-add-inline" data-detail-edit-section type="button">＋ Add documentation link</button>'}</div></div>
+              <section class="detail-section detail-flat-tab-section" id="detailDocsSection">
+                <div class="detail-tab-view-head"><div><h3>Attachments & Documentation</h3><p>Open, remove or add ticket references without leaving this tab.</p></div><span class="section-count">${docs.length}</span></div>
+                <div class="detail-section-content detail-flat-content">
+                  <div class="detail-attachment-list">${docs.length?docs.map((d,i)=>`<div class="detail-attachment-row"><span class="detail-doc-icon">↗</span><div class="detail-attachment-copy"><strong>${esc(d.title||"Documentation")}</strong><small>${esc(d.chapter||d.url||"Open reference")}</small></div><button class="btn small" data-doc-index="${i}" type="button">Open</button><button class="detail-attachment-remove" data-remove-doc-index="${i}" type="button" aria-label="Remove attachment">×</button></div>`).join(""):'<div class="detail-empty detail-empty-plain">No attachments or documentation links yet.</div>'}</div>
+                  <div class="detail-attachment-add"><input id="detailAttachmentTitle" placeholder="Document title"/><input id="detailAttachmentUrl" placeholder="google.com or https://..."/><input id="detailAttachmentChapter" placeholder="Chapter / section"/><button id="detailAddAttachment" class="btn primary small" type="button">＋ Add</button></div>
+                </div>
               </section>
 
-              <section class="detail-section detail-comments-section" id="detailCommentsSection">
-                <div class="detail-section-head detail-comments-top"><span class="detail-section-icon">${dIcons.comments}</span><h3>Comments</h3><span class="section-count">${(t.comments||[]).length}</span><span class="detail-sort-chip">Newest</span></div>
-                <div class="detail-section-content"><div class="comments">${(t.comments||[]).length?(t.comments||[]).slice().reverse().map(c=>commentHtml(c,t)).join(""):'<div class="detail-empty">No comments yet</div>'}</div><div class="detail-comment-compose" style="--member-color:${memberColor(state.currentMember)}"><span class="compose-avatar">${initials(state.currentMember)}</span><textarea id="detailCommentText" placeholder="Add a comment..."></textarea><button id="detailSendComment" class="detail-send" type="button" aria-label="Send comment">${dIcons.send}</button></div></div>
+              <section class="detail-section detail-comments-section detail-flat-tab-section" id="detailCommentsSection">
+                <div class="detail-tab-view-head"><div><h3>Comments</h3><p>Conversation on ${esc(t.id)} · oldest first</p></div><span class="section-count">${(t.comments||[]).length}</span></div>
+                <div class="detail-section-content detail-flat-content detail-comments-content"><div class="comments detail-comments-list">${(t.comments||[]).length?(t.comments||[]).map(c=>commentHtml(c,t)).join(""):'<div class="detail-empty detail-empty-plain">No comments yet</div>'}</div><div class="detail-comment-compose" style="--member-color:${memberColor(state.currentMember)}"><span class="compose-avatar">${initials(state.currentMember)}</span><textarea id="detailCommentText" rows="1" placeholder="Write a comment… Use @ to mention someone"></textarea><button id="detailSendComment" class="detail-send" type="button" aria-label="Send comment">${dIcons.send}</button></div></div>
               </section>
 
-              <section class="detail-section" id="detailHistorySection">
-                <button class="detail-section-head" data-detail-collapse type="button"><span class="detail-section-icon">${dIcons.ticket}</span><h3>History</h3><span class="section-count">${history.length}</span><span class="detail-chevron">${dIcons.chevron}</span></button>
-                <div class="detail-section-content"><div class="detail-history-list">${history.length?history.slice(0,20).map(h=>`<div class="detail-history-item">${esc(h)}</div>`).join(''):'<div class="detail-empty">No history yet</div>'}</div></div>
+              <section class="detail-section detail-flat-tab-section" id="detailHistorySection">
+                <div class="detail-tab-view-head"><div><h3>History</h3><p>Recent activity for this ticket.</p></div><span class="section-count">${history.length}</span></div>
+                <div class="detail-section-content detail-flat-content"><div class="detail-history-list">${history.length?history.slice(0,40).map(h=>`<div class="detail-history-item"><span class="detail-history-dot"></span><span>${esc(h)}</span></div>`).join(''):'<div class="detail-empty detail-empty-plain">No history yet</div>'}</div></div>
               </section>
             </div>
 
@@ -444,11 +448,11 @@
       const body=$('.detail-body');
       if(body)body.scrollTop=0;
       requestAnimationFrame(()=>{
-        if(key==='comments')$('#detailCommentText')?.focus();
+        if(key==='comments'){const list=$('.detail-comments-list');if(list)list.scrollTop=list.scrollHeight;$('#detailCommentText')?.focus();}
       });
     };
     $$('[data-detail-nav]').forEach(btn=>btn.addEventListener('click',()=>setDetailTab(btn.dataset.detailNav)));
-    setDetailTab('details');
+    setDetailTab(initialDetailTab);
     $$('[data-detail-edit-section]').forEach(btn=>btn.addEventListener('click',()=>{$('#modalRoot').innerHTML='';openTicketEditor(ticketId);}));
     $$('[data-detail-add-checklist]').forEach(btn=>btn.addEventListener('click',()=>openQuickChecklistModal(ticketId)));
     if($('#detailHeaderEdit')) $('#detailHeaderEdit').addEventListener('click',()=>$('#detailEdit')?.click());
@@ -482,21 +486,24 @@
     $$('[data-comment-like]').forEach(btn=>btn.addEventListener('click',()=>{
       const c=(t.comments||[]).find(x=>x.id===btn.dataset.commentLike);if(!c)return;c.reactions=c.reactions||{};c.reactions.like=Array.isArray(c.reactions.like)?c.reactions.like:[];
       if(c.reactions.like.includes(state.currentMember))c.reactions.like=c.reactions.like.filter(x=>x!==state.currentMember);else c.reactions.like.push(state.currentMember);
-      saveState();openTicketDetails(t.id,{preserveStack:true});
+      saveState();openTicketDetails(t.id,{preserveStack:true,activeTab:'comments'});
     }));
     $$('[data-comment-edit]').forEach(btn=>btn.addEventListener('click',()=>openCommentEditModal(t.id,btn.dataset.commentEdit)));
     $$('[data-comment-delete]').forEach(btn=>btn.addEventListener('click',async()=>{
       const c=(t.comments||[]).find(x=>x.id===btn.dataset.commentDelete);if(!c)return;
       const ok=await confirmAction({title:'Delete this comment?',message:'The comment will be removed from this ticket.',subject:c.text.slice(0,100),confirmLabel:'Delete comment',icon:'×'});if(!ok)return;
-      t.comments=t.comments.filter(x=>x.id!==c.id);logActivity('comment',t,'Deleted a comment');saveState();openTicketDetails(t.id,{preserveStack:true});
+      t.comments=t.comments.filter(x=>x.id!==c.id);logActivity('comment',t,'Deleted a comment');saveState();openTicketDetails(t.id,{preserveStack:true,activeTab:'comments'});
     }));
     $$('[data-comment-ticket]').forEach(ref=>ref.addEventListener('click',()=>{
       const match=state.tickets.find(x=>x.id.toLowerCase()===ref.dataset.commentTicket.toLowerCase());if(match){ticketDetailStack.push(t.id);openTicketDetails(match.id,{preserveStack:true});}
     }));
     $$('[data-detail-ticket]').forEach(btn=>btn.addEventListener('click',()=>{ticketDetailStack.push(ticketId);openTicketDetails(btn.dataset.detailTicket,{preserveStack:true});}));
     $$('[data-doc-index]').forEach(btn=>btn.addEventListener('click',()=>{const link=docs[Number(btn.dataset.docIndex)];const url=safeHttpUrl(link?.url);if(url)window.open(url,'_blank','noopener');else toast('This documentation URL is not valid.');}));
+    $$('[data-remove-doc-index]').forEach(btn=>btn.addEventListener('click',async()=>{const idx=Number(btn.dataset.removeDocIndex);const link=(t.links||[])[idx];if(!link)return;const ok=await confirmAction({title:'Remove this attachment?',message:'The ticket reference will be removed.',subject:link.title||link.url,confirmLabel:'Remove',icon:'×'});if(!ok)return;t.links.splice(idx,1);t.history=t.history||[];t.history.unshift(`Attachment removed: ${link.title||link.url}`);saveState();refreshDataViews();openTicketDetails(ticketId,{preserveStack:true,activeTab:'attachments'});}));
+    $('#detailAddAttachment')?.addEventListener('click',()=>{const title=$('#detailAttachmentTitle').value.trim();const raw=$('#detailAttachmentUrl').value.trim();const chapter=$('#detailAttachmentChapter').value.trim();if(!raw){$('#detailAttachmentUrl').focus();return;}const url=safeHttpUrl(raw);if(!url){toast('Please enter a valid attachment URL');$('#detailAttachmentUrl').focus();return;}t.links=t.links||[];t.links.push({title:title||'Documentation',url,chapter});t.history=t.history||[];t.history.unshift(`Attachment added: ${title||url}`);saveState();refreshDataViews();openTicketDetails(ticketId,{preserveStack:true,activeTab:'attachments'});});
     attachMentionAutocomplete($("#detailCommentText"));
-    $("#detailSendComment").addEventListener("click",()=>{const text=$("#detailCommentText").value.trim();if(!text)return;t.comments=t.comments||[];t.comments.push({id:"c"+Date.now()+Math.random().toString(36).slice(2,5),by:state.currentMember||"Team member",at:nowLabel(),text,reactions:{}});t.history=t.history||[];t.history.unshift("Comment added");logActivity('comment',t,`Commented: ${text.slice(0,80)}`);saveState();refreshDataViews();openTicketDetails(ticketId,{preserveStack:true});});
+    $("#detailSendComment").addEventListener("click",()=>{const text=$("#detailCommentText").value.trim();if(!text)return;t.comments=t.comments||[];t.comments.push({id:"c"+Date.now()+Math.random().toString(36).slice(2,5),by:state.currentMember||"Team member",at:nowLabel(),text,reactions:{}});t.history=t.history||[];t.history.unshift("Comment added");logActivity('comment',t,`Commented: ${text.slice(0,80)}`);saveState();refreshDataViews();openTicketDetails(ticketId,{preserveStack:true,activeTab:'comments'});});
+    $("#detailCommentText")?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$("#detailSendComment")?.click();}});
   }
 
   function openTicketEditor(ticketId=null,presetStatus="To be started"){
@@ -526,19 +533,19 @@
           <div class="modal-body editor-modal-body">
             <div id="pane-details" class="tab-pane active">${ticketForm(draft)}</div>
             <div id="pane-comments" class="tab-pane editor-comments-pane">
-              <div class="editor-comments-shell">
-                <div class="editor-comments-head"><div><strong>Comments</strong><small>${(draft.comments||[]).length} comment${(draft.comments||[]).length===1?'':'s'}</small></div></div>
+              <div class="editor-comments-flat">
+                <div class="editor-comments-meta"><strong>${(draft.comments||[]).length} comment${(draft.comments||[]).length===1?'':'s'}</strong><span>Oldest first</span></div>
                 <div class="comments editor-comments-list">
                   ${(draft.comments||[]).length ? draft.comments.map(editorDraftCommentHtml).join("") : '<div class="detail-empty editor-comments-empty">No comments yet</div>'}
                 </div>
                 <div class="editor-comment-compose" style="--member-color:${memberColor(state.currentMember)}">
-                  <span class="compose-avatar">${esc(initials(state.currentMember))}</span>
+                  <span class="compose-avatar">${initials(state.currentMember)}</span>
                   <textarea id="commentText" rows="1" placeholder="Write a comment… Use @ to mention someone"></textarea>
                   <button id="sendComment" class="editor-comment-send" type="button" aria-label="Add comment to draft"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 16 8-16 8 3-8-3-8Z"/><path d="M7 12h13"/></svg></button>
                 </div>
               </div>
             </div>
-            <div id="pane-history" class="tab-pane">
+                        <div id="pane-history" class="tab-pane">
               <div class="history">
                 ${(draft.history||[]).length
                   ? (draft.history||[]).map(h=>`<div class="history-item">${esc(h)}<small>${existing?"Saved activity":"Draft activity"}</small></div>`).join("")
@@ -722,7 +729,7 @@
       draft.history.unshift("Comment added");
       $("#commentText").value="";
       const commentsBox=$("#pane-comments .comments");
-      if(commentsBox)commentsBox.innerHTML=draft.comments.map(editorDraftCommentHtml).join("");
+      if(commentsBox){commentsBox.innerHTML=draft.comments.map(editorDraftCommentHtml).join("");commentsBox.scrollTop=commentsBox.scrollHeight;}
       const commentsMeta=$(".editor-comments-head small",$("#pane-comments"));if(commentsMeta)commentsMeta.textContent=`${draft.comments.length} comment${draft.comments.length===1?'':'s'}`;
       const commentTab=$('.tab[data-tab="comments"] span');if(commentTab)commentTab.textContent=`Comments (${draft.comments.length})`;
       toast("Comment added to draft — save the ticket to publish it");
