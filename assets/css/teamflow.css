@@ -1911,3 +1911,30 @@ html[data-theme="dark"] .editor-semantic-select.semantic-priority-low{background
 .editor-collab-selected{display:flex;gap:6px;flex-wrap:wrap;padding-top:8px}.editor-selected-person{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:4px 8px 4px 4px;border:1px solid var(--border);border-radius:999px;background:var(--panel-2)}.editor-selected-person>span{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--member-color);color:#fff;font-size:8px;font-weight:950}.editor-selected-person strong{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:145px}
 html[data-theme="dark"] .ticket-editor-modal .editor-semantic-select{color:inherit!important;-webkit-text-fill-color:currentColor!important}
 @media(max-width:760px){.notification-dropdown{right:8px!important;width:calc(100vw - 16px)}.notifications-page-hero{align-items:flex-start;flex-wrap:wrap}.notifications-page-hero>.btn{margin-left:55px}.notification-row{grid-template-columns:36px minmax(0,1fr)}.notification-meta{grid-column:2}.notification-copy small{white-space:normal}}
+
+
+/* Edit ticket semantic controls + floating collaborator picker */
+.ticket-editor-modal .editor-key-row .editor-semantic-select{
+  appearance:none!important;-webkit-appearance:none!important;
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%)!important;
+  background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%!important;
+  background-size:5px 5px,5px 5px!important;background-repeat:no-repeat!important;
+  padding-right:30px!important;border-left-width:4px!important;font-weight:900!important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 8%,transparent)!important;
+}
+.ticket-editor-modal .editor-semantic-select.semantic-status-done,.ticket-editor-modal .editor-semantic-select.semantic-status-deployed-on-sit{background-color:#e9f8ee!important;border-color:#79cf95!important;color:#126b34!important;-webkit-text-fill-color:#126b34!important}
+.ticket-editor-modal .editor-semantic-select.semantic-status-ongoing,.ticket-editor-modal .editor-semantic-select.semantic-status-code-review{background-color:#eaf4ff!important;border-color:#79b8ed!important;color:#135f9f!important;-webkit-text-fill-color:#135f9f!important}
+.ticket-editor-modal .editor-semantic-select.semantic-status-on-hold{background-color:#fff3d8!important;border-color:#e7b84e!important;color:#8c5200!important;-webkit-text-fill-color:#8c5200!important}
+.ticket-editor-modal .editor-semantic-select.semantic-status-deprecated{background-color:#eef0f4!important;border-color:#aab2c0!important;color:#4c586d!important;-webkit-text-fill-color:#4c586d!important}
+.ticket-editor-modal .editor-semantic-select.semantic-status-to-be-started{background-color:#f0eaff!important;border-color:#ae91ff!important;color:#6136d8!important;-webkit-text-fill-color:#6136d8!important}
+.ticket-editor-modal .editor-semantic-select.semantic-priority-high,.ticket-editor-modal .editor-semantic-select.semantic-risk-blocked{background-color:#ffebeb!important;border-color:#f08c8c!important;color:#b91f2b!important;-webkit-text-fill-color:#b91f2b!important}
+.ticket-editor-modal .editor-semantic-select.semantic-priority-medium,.ticket-editor-modal .editor-semantic-select.semantic-risk-at-risk{background-color:#fff0dc!important;border-color:#f0b56d!important;color:#b45200!important;-webkit-text-fill-color:#b45200!important}
+.ticket-editor-modal .editor-semantic-select.semantic-priority-low{background-color:#eaf8ef!important;border-color:#86cf9f!important;color:#1f703e!important;-webkit-text-fill-color:#1f703e!important}
+.ticket-editor-modal .editor-semantic-select.semantic-risk-none{background-color:var(--panel-2)!important;border-color:var(--border)!important;color:var(--text)!important;-webkit-text-fill-color:var(--text)!important}
+.editor-collaborator-card{overflow:visible!important;position:relative;z-index:5}
+.editor-collab-menu.editor-collab-floating{position:fixed!important;z-index:10050!important;left:auto;right:auto;top:auto;max-height:360px;display:flex;flex-direction:column;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--border));box-shadow:0 24px 60px rgba(19,24,44,.28),0 0 0 1px rgba(255,255,255,.5);background:var(--panel);overflow:hidden}
+.editor-collab-menu.editor-collab-floating.hidden{display:none!important}
+.editor-collab-menu.editor-collab-floating .editor-collab-options{order:1;max-height:270px;overflow:auto;padding:6px}
+.editor-collab-menu.editor-collab-floating .editor-collab-search-wrap{order:2;border-top:1px solid var(--border);border-bottom:0;background:var(--panel);padding:9px}
+.editor-collab-menu.editor-collab-floating .editor-collab-search-wrap input{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 8%,transparent)}
+.editor-collab-trigger[aria-expanded="true"]{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 10%,transparent)}
