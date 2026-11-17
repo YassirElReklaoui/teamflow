@@ -1,6 +1,8 @@
   let notificationItems=[];
   let notificationFilter="all";
+  let notificationPollTimer=null;
   let notificationDropdownOpen=false;
+  window.teamFlowGetNotifications=()=>notificationItems.slice();
 
   function notificationSvg(kind){
     const paths={
@@ -106,7 +108,9 @@
     try{
       const data=await cloudRequest('/notifications?limit=120');
       notificationItems=Array.isArray(data.notifications)?data.notifications:[];
-      renderNotifications();return notificationItems;
+      renderNotifications();
+      if(document.getElementById('overviewView')?.classList.contains('active')&&typeof renderOverview==='function')renderOverview();
+      return notificationItems;
     }catch(err){if(!quiet)tfLogError('Loading notifications failed',err);return notificationItems;}
   }
 
@@ -194,9 +198,8 @@
 
   function initNotifications(){
     ensureNotificationUi();renderNotifications();
+    clearInterval(notificationPollTimer);notificationPollTimer=setInterval(()=>{if(!document.hidden)fetchNotifications();},6000);
     setTimeout(()=>fetchNotifications(),1200);
-    window.teamFlowNotificationsOnVersionChanged=()=>fetchNotifications({quiet:true});
-    window.teamFlowNotificationsOnConnected=()=>fetchNotifications({quiet:true});
     window.addEventListener('resize',()=>{if(notificationDropdownOpen)positionNotificationDropdown();});
   }
 

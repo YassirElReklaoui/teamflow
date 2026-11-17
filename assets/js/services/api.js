@@ -199,6 +199,33 @@
     return data;
   }
 
+  async function cloudFileRequest(path,{method="GET",body,headers={}}={}){
+    if(!apiConfigured())throw Object.assign(new Error("Server URL is not configured"),{status:0});
+    const token=getCloudToken();
+    let response;
+    try{
+      response=await fetch(`${normalizedApiBase(cloudConfig.apiBaseUrl)}${path}`,{
+        method,
+        headers:{...(token?{Authorization:`Bearer ${token}`}:{ }),...headers},
+        body,
+        cache:"no-store"
+      });
+    }catch(fetchErr){
+      const err=Object.assign(new Error("Network unavailable"),{status:0,code:"NETWORK_ERROR",cause:fetchErr});
+      tfLogError("File API network request failed",err,{path,method});
+      throw err;
+    }
+    if(!response.ok){
+      const text=await response.text();let data={};
+      try{data=text?JSON.parse(text):{};}catch(_){data={error:text||`HTTP ${response.status}`};}
+      const err=Object.assign(new Error(data.error||`HTTP ${response.status}`),{status:response.status,data});
+      tfLogError("File API request failed",err,{path,method,status:response.status});
+      throw err;
+    }
+    return response;
+  }
+  window.teamFlowCloudFileRequest=cloudFileRequest;
+
   function showAuthGate(message=""){
     const gate=document.getElementById("teamflowAuthGate");if(!gate)return;
     gate.classList.remove("hidden");
