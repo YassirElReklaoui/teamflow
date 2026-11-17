@@ -684,7 +684,7 @@
     [document.getElementById("addStatus"),document.getElementById("addWorkflowStep"),document.getElementById("settingsBackupShortcut"),document.getElementById("createBackupNow")].forEach(el=>{if(el)el.style.display=isAdmin?"inline-flex":"none";});
     const settingsView=document.getElementById("settingsView");if(settingsView)settingsView.classList.toggle("is-non-admin",!isAdmin);
     const localDataCard=document.querySelector("#settingsView .local-settings");if(localDataCard)localDataCard.style.display=isAdmin?"":"none";
-    const workspaceCard=document.querySelector("#settingsView .workspace-identity-settings");if(workspaceCard)workspaceCard.style.display=isAdmin?"":"none";
+    const workspaceCard=document.querySelector("#settingsView .workspace-identity-settings");if(workspaceCard)workspaceCard.style.display=isAdmin?"":"none";const d1Card=document.querySelector("#settingsView .d1-migration-settings");if(d1Card)d1Card.style.display=isAdmin?"":"none";if(isAdmin&&!d1MigrationLoaded&&!d1MigrationLoading)setTimeout(()=>loadD1MigrationStatus(),0);
     const workspaceFields=[document.getElementById("workspaceDisplayName"),document.getElementById("workspaceTicketPrefix"),document.getElementById("workspaceFallbackPoll")];workspaceFields.forEach(el=>{if(el)el.disabled=!isAdmin;});
     const workspaceSave=document.getElementById("saveWorkspaceIdentity");if(workspaceSave)workspaceSave.style.display=isAdmin?"inline-flex":"none";
     const workspaceReadOnly=document.getElementById("workspaceIdentityReadOnly");if(workspaceReadOnly)workspaceReadOnly.classList.toggle("hidden",isAdmin);
@@ -768,6 +768,29 @@
     setTimeout(()=>document.getElementById("currentOwnPassword")?.focus(),0);
   }
 
+  const D1_MIGRATION_LABELS={Meta:"Workspace meta",Users:"Users / authentication",TeamMembers:"Team members",Workflows:"Workflows",Releases:"Releases",Tickets:"Tickets",Comments:"Comments",Checklist:"Checklist",DocLinks:"Document links",Dependencies:"Dependencies",Documents:"Documents metadata",Activity:"Activity",Notifications:"Notifications",Settings:"Settings",UserTicketState:"User preferences / ticket state",Backups:"Backups",BackupData:"Backup data"};
+  let d1MigrationStatus={};let d1MigrationLoaded=false;let d1MigrationLoading=false;let d1MigrationBusy="";
+  function renderD1MigrationRows(){
+    const body=document.getElementById("d1MigrationRows"),summary=document.getElementById("d1MigrationSummary");if(!body)return;
+    const names=Object.keys(D1_MIGRATION_LABELS);
+    body.innerHTML=names.map(name=>{const s=d1MigrationStatus[name]||{};const sheet=Number(s.sheetCount||0),d1=Number(s.d1Count||0);const done=sheet>0&&d1>=sheet;const partial=d1>0&&!done;const status=done?"Migrated":partial?"Partial":sheet===0?"No source rows":"Not migrated";const cls=done?"done":partial?"partial":sheet===0?"empty":"";const busy=d1MigrationBusy===name;return `<tr data-d1-dataset="${name}"><td><strong>${D1_MIGRATION_LABELS[name]}</strong><div class="note">${name}</div></td><td class="d1-migration-count">${sheet}</td><td class="d1-migration-count">${d1}</td><td><span class="d1-migration-status ${cls}">${status}</span></td><td><button class="btn ${done?'':'primary'} d1-migrate-btn" type="button" data-d1-migrate="${name}" ${busy||sheet===0?'disabled':''}>${busy?'Migrating…':done?'Sync again':'Migrate'}</button></td></tr>`}).join("");
+    body.querySelectorAll("[data-d1-migrate]").forEach(btn=>btn.addEventListener("click",()=>migrateD1Dataset(btn.dataset.d1Migrate)));
+    if(summary){const vals=Object.values(d1MigrationStatus);const complete=vals.filter(s=>Number(s.sheetCount||0)>0&&Number(s.d1Count||0)>=Number(s.sheetCount||0)).length;summary.textContent=d1MigrationLoaded?`${complete} of ${names.length} datasets currently match or exceed their source row count.`:"Not checked yet.";}
+  }
+  async function loadD1MigrationStatus(dataset=""){
+    if(cloudUser?.role!=="admin"||d1MigrationLoading)return;d1MigrationLoading=true;
+    const btn=document.getElementById("refreshD1Migration");if(btn){btn.disabled=true;btn.textContent="Refreshing…";}
+    try{const q=dataset?`?dataset=${encodeURIComponent(dataset)}`:"";const data=await cloudRequest(`/admin/d1-migration/status${q}`);if(data?.datasets)Object.assign(d1MigrationStatus,data.datasets);d1MigrationLoaded=true;renderD1MigrationRows();}
+    catch(err){tfLogError("Loading D1 migration status failed",err);const summary=document.getElementById("d1MigrationSummary");if(summary)summary.textContent=err.message||"Could not load migration counts.";}
+    finally{d1MigrationLoading=false;if(btn){btn.disabled=false;btn.textContent="↻ Refresh counts";}}
+  }
+  async function migrateD1Dataset(dataset){
+    if(cloudUser?.role!=="admin"||!D1_MIGRATION_LABELS[dataset]||d1MigrationBusy)return;d1MigrationBusy=dataset;renderD1MigrationRows();
+    const summary=document.getElementById("d1MigrationSummary");if(summary)summary.textContent=`Migrating ${D1_MIGRATION_LABELS[dataset]}…`;
+    try{const data=await cloudRequest("/admin/d1-migration/dataset",{method:"POST",body:{dataset}});if(data?.datasetStatus)d1MigrationStatus[dataset]=data.datasetStatus;else await loadD1MigrationStatus(dataset);d1MigrationLoaded=true;toast(`${D1_MIGRATION_LABELS[dataset]} migration completed`);if(summary)summary.textContent=`${D1_MIGRATION_LABELS[dataset]}: ${Number(data.insertedOrUpdated||0)} inserted/updated, ${Number(data.skippedUnchanged||0)} unchanged.`;}
+    catch(err){tfLogError(`Migrating ${dataset} failed`,err);if(summary)summary.textContent=err.message||`${D1_MIGRATION_LABELS[dataset]} migration failed.`;toast(`${D1_MIGRATION_LABELS[dataset]} migration failed`);}
+    finally{d1MigrationBusy="";renderD1MigrationRows();}
+  }
   function bindCloudUi(){
     const saveConnectionBtn=document.getElementById("tfAuthSaveConnection"),testConnectionBtn=document.getElementById("tfAuthTestConnection"),loginBtn=document.getElementById("tfLoginButton"),setupBtn=document.getElementById("tfSetupButton");
     saveConnectionBtn?.addEventListener("click",()=>{authTooltipAnchor=saveConnectionBtn;saveConnectionFromGate();});
@@ -779,7 +802,7 @@
     document.getElementById("cloudTestConnection")?.addEventListener("click",runCloudSyncCheck);
     document.getElementById("cloudLogout")?.addEventListener("click",cloudLogout);
     document.getElementById("cloudManageUsers")?.addEventListener("click",openCloudUsersModal);
-    document.getElementById("changeOwnPassword")?.addEventListener("click",openChangePasswordModal);
+    document.getElementById("changeOwnPassword")?.addEventListener("click",openChangePasswordModal);document.getElementById("refreshD1Migration")?.addEventListener("click",()=>loadD1MigrationStatus());
     const profileBtn=document.getElementById("viewAsAvatarBtn");profileBtn?.addEventListener("click",openPersonalProfileModal);profileBtn?.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPersonalProfileModal();}});
   }
 
