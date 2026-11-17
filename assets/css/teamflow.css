@@ -2391,3 +2391,12 @@ html,body,*{
   #settingsView .account-security-body{align-items:stretch;flex-direction:column}
   #settingsView .account-security-body .btn{width:100%;min-width:0}
 }
+
+
+/* 2026-11-17 overview placement + rich-note resilience */
+#overviewView .overview-spotlight.overview-spotlight-single{display:block;grid-template-columns:1fr}
+#overviewView .overview-spotlight.overview-spotlight-single .overview-hero-card{width:100%;min-height:150px}
+#overviewView .overview-main-grid>.overview-attention-card{grid-column:2;align-self:start}
+#overviewView .overview-main-grid>.due-next-card{grid-column:auto}
+#overviewView .overview-side-stack .due-next-card{width:100%}
+@media(max-width:1050px){#overviewView .overview-main-grid>.overview-attention-card{grid-column:1}}

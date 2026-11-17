@@ -36,7 +36,7 @@
           <div class="modal-body">
             <div class="form-grid">
               <div class="field full"><label>Page name *</label><input id="blankPageName" value="Project Notes" placeholder="e.g. SIT Release Notes" /></div>
-              <div class="field full"><div class="note">This note stays inside TeamFlow and is saved with your local workspace/export. It does not create a SharePoint document.</div></div>
+              <div class="field full"><div class="note">This note stays inside TeamFlow. Rich text is stored securely in TeamFlow file storage so large notes, tables and pasted formatting are supported.</div></div>
             </div>
           </div>
           <div class="modal-actions"><div class="spacer"></div><button id="cancelBlankPage" class="btn" type="button">Cancel</button><button id="createBlankPage" class="btn primary" type="button">＋ Create Note</button></div>
@@ -302,12 +302,12 @@
   function sanitizeRichHtml(html){
     const template=document.createElement("template");
     template.innerHTML=String(html||"");
-    template.content.querySelectorAll("script,iframe,object,embed,style,link,meta,base,form,input,button,textarea,select").forEach(el=>el.remove());
+    template.content.querySelectorAll("script,iframe,object,embed,style,link,meta,base,form,input,button,textarea,select,img,video,audio,svg,canvas").forEach(el=>el.remove());
     template.content.querySelectorAll("*").forEach(el=>{
       [...el.attributes].forEach(attr=>{
         const n=attr.name.toLowerCase();
         const v=String(attr.value||"").trim().toLowerCase();
-        if(n.startsWith("on") || n==="srcdoc" || ((n==="href"||n==="src") && v.startsWith("javascript:"))) el.removeAttribute(attr.name);
+        if(n.startsWith("on") || n==="srcdoc" || ((n==="href"||n==="src") && v.startsWith("javascript:")) || (n==="style" && (v.includes("expression(") || v.includes("url(")))) el.removeAttribute(attr.name);
       });
       if(el.tagName==="A"){
         el.setAttribute("target","_blank");
@@ -317,6 +317,36 @@
     return template.innerHTML;
   }
 
+
+  function clipboardPlainTextToRichHtml(text){
+    const raw=String(text||"").replace(/\r\n?/g,"\n");
+    const lines=raw.split("\n");
+    const tabRows=lines.filter(line=>line.includes("\t"));
+    if(tabRows.length>=2){
+      const rows=lines.filter(line=>line.trim()).map(line=>line.split("\t"));
+      const width=Math.max(0,...rows.map(r=>r.length));
+      if(width>=2){
+        return `<table><tbody>${rows.map((row,ri)=>`<tr>${Array.from({length:width},(_,ci)=>{const tag=ri===0?"th":"td";return `<${tag}>${esc(row[ci]||"")}</${tag}>`;}).join("")}</tr>`).join("")}</tbody></table>`;
+      }
+    }
+    return textToRichHtml(raw);
+  }
+
+  function insertRichHtmlAtSelection(editor,html){
+    editor.focus();
+    const safe=sanitizeRichHtml(html);
+    const sel=window.getSelection();
+    if(!sel || !sel.rangeCount || !editor.contains(sel.anchorNode)){
+      editor.insertAdjacentHTML("beforeend",safe);
+      return;
+    }
+    const range=sel.getRangeAt(0);
+    range.deleteContents();
+    const fragment=range.createContextualFragment(safe);
+    const last=fragment.lastChild;
+    range.insertNode(fragment);
+    if(last){range.setStartAfter(last);range.collapse(true);sel.removeAllRanges();sel.addRange(range);}
+  }
 
   function attachRichEditorMentions(editor,onCommit){
     if(!editor||editor.dataset.richMentionsReady==='1')return;
@@ -355,8 +385,8 @@
     window.addEventListener('resize',()=>{if(!menu.classList.contains('hidden'))position();});
   }
 
-  function renderRichBlankEditor(doc,content){
-    if(!doc.richHtml) doc.richHtml=textToRichHtml(doc.text||"");
+  function renderRichBlankEditor(doc,content,loadedHtml=null){
+    const initialRichHtml=loadedHtml!==null?String(loadedHtml||""):String(doc.richHtml||textToRichHtml(doc.text||""));
     content.innerHTML=`<div class="blank-pad"><div class="rich-editor-shell">
       <div class="rich-toolbar" role="toolbar" aria-label="Document formatting">
         <select class="rich-tool-select" data-editor-format title="Text style"><option value="p">Normal</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option><option value="pre">Code block</option></select>
@@ -388,7 +418,7 @@
         <div class="rich-link-grid"><input data-link-label placeholder="Link text (optional)" /><input data-link-url type="text" inputmode="url" placeholder="google.com or https://..." /></div>
         <div class="rich-link-actions"><button class="btn small" data-link-cancel type="button">Cancel</button><button class="btn primary small" data-link-apply type="button">Insert link</button></div>
       </div>
-      <div class="rich-editor-body" contenteditable="true" spellcheck="true" data-rich-editor data-placeholder="Start typing your notes, decisions, documentation, or meeting summary…">${sanitizeRichHtml(doc.richHtml)}</div>
+      <div class="rich-editor-body" contenteditable="true" spellcheck="true" data-rich-editor data-placeholder="Start typing or paste formatted content here…">${sanitizeRichHtml(initialRichHtml)}</div>
       <div class="rich-editor-footer"><span class="rich-save-dot" data-save-dot></span><span data-save-status>Saved</span><span class="rich-editor-mode">Rich text · tables · links · @mentions</span><button class="btn primary small rich-document-save" data-document-save type="button" disabled>Save changes</button></div>
     </div></div>`;
 
@@ -416,10 +446,43 @@
     const markDirty=()=>{
       if(dirty)return;dirty=true;saveStatus.textContent="Unsaved changes";saveButton.disabled=false;shell.classList.add('has-unsaved-changes');saveDot?.classList.add('unsaved');
     };
-    const saveDocument=()=>{
-      if(!dirty)return;doc.richHtml=sanitizeRichHtml(editor.innerHTML);doc.text=editor.innerText;doc.updatedAt=new Date().toISOString();saveState();dirty=false;saveStatus.textContent="Saved";saveButton.disabled=true;shell.classList.remove('has-unsaved-changes');saveDot?.classList.remove('unsaved');toast(`${doc.name} saved`);
+    let saveTimer=null;
+    let saveInFlight=false;
+    let saveAgain=false;
+    const setSavedUi=()=>{dirty=false;saveStatus.textContent="Saved";saveButton.disabled=true;shell.classList.remove('has-unsaved-changes');saveDot?.classList.remove('unsaved');};
+    const saveDocument=async({quiet=false}={})=>{
+      clearTimeout(saveTimer);
+      if(!dirty)return true;
+      if(saveInFlight){saveAgain=true;return false;}
+      const html=sanitizeRichHtml(editor.innerHTML);
+      saveInFlight=true;saveAgain=false;saveStatus.textContent="Saving…";saveButton.disabled=true;shell.classList.add('is-saving');
+      try{
+        if(window.teamFlowCloudFileRequest){
+          const response=await window.teamFlowCloudFileRequest(`/documents/${encodeURIComponent(doc.id)}/note`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:doc.name,html,baseUpdatedAt:doc.updatedAt||""})});
+          const data=await response.json();
+          const savedDocument=data.document||{id:doc.id,name:doc.name,kind:'blank'};
+          Object.keys(doc).forEach(k=>{if(k!=="id")delete doc[k];});Object.assign(doc,savedDocument);
+          cloudVersion=Number(data.version||cloudVersion);cloudLastStamp=data.updatedAt||new Date().toISOString();cloudLastError="";cloudBaselineState=clone(state);deltaDirty=false;
+          setSavedUi();
+        }else{
+          // Local/offline-only mode. In a cloud deployment we never fall back to saveState(),
+          // because that would serialize the rich note into a Google Sheets cell.
+          if(String(doc.storage||"").startsWith("r2") || cloudUser){
+            throw new Error("Cloud file storage is temporarily unavailable. Your note remains unsaved in this browser; reconnect and save again.");
+          }
+          doc.richHtml=html;doc.text=editor.innerText;doc.updatedAt=new Date().toISOString();saveState();setSavedUi();
+        }
+        if(!quiet)toast(`${doc.name} saved`);
+        return true;
+      }catch(err){
+        dirty=true;saveStatus.textContent="Save failed";saveButton.disabled=false;shell.classList.add('has-unsaved-changes');saveDot?.classList.add('unsaved');tfLogError("Project note save failed",err,{documentId:doc.id});if(!quiet)toast(err?.message||"Could not save project note");return false;
+      }finally{
+        saveInFlight=false;shell.classList.remove('is-saving');
+        if(saveAgain||dirty&&sanitizeRichHtml(editor.innerHTML)!==html){saveAgain=false;saveTimer=setTimeout(()=>saveDocument({quiet:true}),2600);}
+      }
     };
-    saveButton.addEventListener('click',saveDocument);
+    const queueAutoSave=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveDocument({quiet:true}),2600);};
+    saveButton.addEventListener('click',()=>saveDocument());
     attachRichEditorMentions(editor,markDirty);
 
     const exec=(cmd,value=null)=>{
@@ -433,11 +496,20 @@
       return el?.closest?.("td,th") || null;
     };
 
-    editor.addEventListener("input",markDirty);
+    editor.addEventListener("input",()=>{markDirty();queueAutoSave();});
     editor.addEventListener("mouseup",captureRange);
     editor.addEventListener("keyup",captureRange);
     editor.addEventListener("focus",captureRange);
-    editor.addEventListener("paste",()=>setTimeout(()=>{editor.innerHTML=sanitizeRichHtml(editor.innerHTML);captureRange();markDirty();},0));
+    editor.addEventListener("paste",e=>{
+      const clipboard=e.clipboardData;
+      if(!clipboard)return;
+      const html=clipboard.getData("text/html");
+      const text=clipboard.getData("text/plain");
+      e.preventDefault();
+      insertRichHtmlAtSelection(editor,html?html:clipboardPlainTextToRichHtml(text));
+      editor.innerHTML=sanitizeRichHtml(editor.innerHTML);
+      captureRange();markDirty();queueAutoSave();
+    });
     editor.addEventListener("click",e=>{
       const link=e.target.closest?.("a");
       if(!link || !editor.contains(link)) return;
@@ -611,6 +683,15 @@
         : `<div class="doc-empty">This PDF was loaded only for the current browser session. Re-upload the PDF to preview it again.</div>`;
     }else if(doc.kind==="sharepoint"){
       content.innerHTML=`<iframe src="${esc(doc.url)}" title="${esc(doc.name)}"></iframe>`;
+    }else if(doc.kind==="blank"&&doc.storageKey){
+      content.innerHTML='<div class="doc-empty">Loading project note…</div>';
+      (async()=>{
+        try{
+          const response=await window.teamFlowCloudFileRequest(`/documents/${encodeURIComponent(doc.id)}/content`);
+          const html=await response.text();
+          if(activeDocId!==doc.id)return;const current=$("#docContent");if(current)renderRichBlankEditor(doc,current,html);
+        }catch(err){tfLogError("Project note load failed",err,{documentId:doc.id});if(activeDocId===doc.id&&$("#docContent"))$("#docContent").innerHTML=`<div class="doc-empty">Could not load this project note. ${esc(err?.message||"")}</div>`;}
+      })();
     }else{
       renderRichBlankEditor(doc,content);
     }

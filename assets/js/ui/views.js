@@ -38,13 +38,12 @@
     const focusRows=focus.length?focus.map(t=>`<button class="overview-focus-row" data-overview-ticket="${esc(t.id)}" type="button"><span class="overview-attention-dot ${isBlocked(t)?'blocked':isOverdue(t)?'overdue':'risk'}"></span><strong>${esc(t.id)} · ${esc(t.title)}</strong><span class="overview-attention-pill">${isBlocked(t)?'Blocked':isOverdue(t)?dueInfo(t).text:'At risk'}</span><i>${svg.chevron}</i></button>`).join(''):'<div class="overview-empty-state compact"><span>✓</span><strong>No critical attention items</strong></div>';
     const activityRows=activity.length?activity.map((a,index)=>`<div class="overview-activity-row"><div class="overview-activity-line ${index===activity.length-1?'last':''}"><span class="overview-activity-dot"></span></div><div class="overview-activity-icon">${a.kind==='comment'?'💬':a.kind==='move'?'↔':a.kind==='create'?'＋':'✦'}</div><div class="overview-activity-copy"><strong>${esc(a.by)} · ${esc(a.ticketId||'Workspace')}</strong><p>${esc(a.message||a.title||a.kind)}</p><time>${Number(a.ts)?new Date(Number(a.ts)).toLocaleString('en-GB'):''}</time></div></div>`).join(''):'<div class="overview-empty-state"><span>✦</span><strong>Activity will appear here</strong></div>';
     $("#overviewContent").innerHTML=`
-      <div class="overview-spotlight">
+      <div class="overview-spotlight overview-spotlight-single">
         <div class="overview-hero-card">
           <span class="overview-hero-accent"></span>
           <div class="overview-hero-copy"><small>Delivery pulse</small><h3>${delivered} of ${total} tickets delivered</h3><p>TeamFlow is tracking ${active} active tickets across ${state.statuses.length} workflows. ${blocked||overdue?`${blocked} blocked and ${overdue} overdue item${blocked+overdue===1?' needs':'s need'} attention.`:'Delivery currently has no overdue or blocked tickets.'}</p></div>
           <div class="overview-progress-ring" style="--overview-angle:${avg*3.6}deg"><div><strong>${avg}%</strong><span>overall<br>progress</span></div></div>
         </div>
-        <div class="overview-focus-card"><div class="overview-card-head reference"><h3>${svg.alert}<span>Needs attention</span></h3></div><div class="overview-focus-list">${focusRows}</div></div>
       </div>
       <div class="overview-hero-grid">
         <div class="overview-metric metric-open"><span class="overview-metric-icon">${svg.layers}</span><div><small>Open workload</small><strong>${active}</strong><span>currently active tickets</span></div></div>
@@ -54,9 +53,10 @@
       </div>
       <div class="overview-grid overview-main-grid">
         <div class="overview-card workflow-pulse-card"><div class="overview-card-head reference"><h3>${svg.chart}<span>Workflow pulse</span></h3><span class="overview-count-pill">${total} tickets</span></div><div class="overview-flow-list">${statusBars}</div></div>
-        <div class="overview-card due-next-card"><div class="overview-card-head reference"><h3>${svg.calendar}<span>Due next</span></h3></div><div class="overview-ticket-list">${ticketRows(upcoming)}</div></div>
+        <div class="overview-focus-card overview-attention-card"><div class="overview-card-head reference"><h3>${svg.alert}<span>Needs attention</span></h3></div><div class="overview-focus-list">${focusRows}</div></div>
         <div class="overview-card recent-activity-card"><div class="overview-card-head reference"><h3>${svg.pulse}<span>Recent activity</span></h3><span class="overview-count-pill">Latest ${activity.length}</span></div><div class="overview-activity-feed">${activityRows}</div></div>
         <div class="overview-side-stack">
+          <div class="overview-card due-next-card"><div class="overview-card-head reference"><h3>${svg.calendar}<span>Due next</span></h3></div><div class="overview-ticket-list">${ticketRows(upcoming)}</div></div>
           <div class="overview-card"><div class="overview-card-head reference"><h3>${svg.star}<span>Favorites</span></h3></div><div class="overview-ticket-list">${ticketRows(fav)}</div></div>
           <div class="overview-card"><div class="overview-card-head reference"><h3>${svg.clock}<span>Recently opened</span></h3></div><div class="overview-ticket-list">${ticketRows(recent)}</div></div>
         </div>
