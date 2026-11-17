@@ -2392,11 +2392,18 @@ html,body,*{
   #settingsView .account-security-body .btn{width:100%;min-width:0}
 }
 
-
-/* 2026-11-17 overview placement + rich-note resilience */
-#overviewView .overview-spotlight.overview-spotlight-single{display:block;grid-template-columns:1fr}
-#overviewView .overview-spotlight.overview-spotlight-single .overview-hero-card{width:100%;min-height:150px}
-#overviewView .overview-main-grid>.overview-attention-card{grid-column:2;align-self:start}
-#overviewView .overview-main-grid>.due-next-card{grid-column:auto}
-#overviewView .overview-side-stack .due-next-card{width:100%}
-@media(max-width:1050px){#overviewView .overview-main-grid>.overview-attention-card{grid-column:1}}
+/* ===== 2026-11-17 Documents fixed-height workspace ===== */
+@media (min-width:981px){
+  #documentsView.active{height:calc(100vh - 96px);min-height:0;overflow:hidden}
+  #documentsView>.panel{height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+  #documentsView .page-head,#documentsView .doc-actions{flex:0 0 auto}
+  #documentsView .doc-layout{flex:1 1 auto;min-height:0;overflow:hidden}
+  #documentsView .doc-list{height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  #documentsView .doc-viewer{height:100%;min-height:0;overflow:hidden}
+  #documentsView .doc-toolbar{flex:0 0 auto}
+  #documentsView #docContent{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
+  #documentsView .doc-viewer iframe{height:100%;min-height:0}
+  #documentsView .doc-empty{min-height:0}
+  #documentsView .rich-editor-shell{height:100%;min-height:0}
+  #documentsView .rich-editor-body{min-height:0;overflow:auto}
+}

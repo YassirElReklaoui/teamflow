@@ -2,6 +2,10 @@
   let notificationFilter="all";
   let notificationPollTimer=null;
   let notificationDropdownOpen=false;
+  let notificationFetchPromise=null;
+  let notificationLastFetchAt=0;
+  const NOTIFICATION_FALLBACK_POLL_MS=300000;
+  const NOTIFICATION_FETCH_COOLDOWN_MS=5000;
   window.teamFlowGetNotifications=()=>notificationItems.slice();
 
   function notificationSvg(kind){
@@ -103,16 +107,33 @@
     document.querySelectorAll('[data-notification-id]').forEach(btn=>btn.addEventListener('click',()=>openNotification(btn.dataset.notificationId)));
   }
 
-  async function fetchNotifications({quiet=true}={}){
-    if(!cloudReady||!getCloudToken())return [];
-    try{
-      const data=await cloudRequest('/notifications?limit=120');
-      notificationItems=Array.isArray(data.notifications)?data.notifications:[];
-      renderNotifications();
-      if(document.getElementById('overviewView')?.classList.contains('active')&&typeof renderOverview==='function')renderOverview();
-      return notificationItems;
-    }catch(err){if(!quiet)tfLogError('Loading notifications failed',err);return notificationItems;}
+  async function fetchNotifications({quiet=true,force=false}={}){
+    if(!cloudReady||!getCloudToken())return notificationItems;
+    if(notificationFetchPromise)return notificationFetchPromise;
+    const now=Date.now();
+    if(!force&&now-notificationLastFetchAt<NOTIFICATION_FETCH_COOLDOWN_MS)return notificationItems;
+    notificationLastFetchAt=now;
+    notificationFetchPromise=(async()=>{
+      try{
+        const data=await cloudRequest('/notifications?limit=120');
+        notificationItems=Array.isArray(data.notifications)?data.notifications:[];
+        renderNotifications();
+        if(document.getElementById('overviewView')?.classList.contains('active')&&typeof renderOverview==='function')renderOverview();
+        return notificationItems;
+      }catch(err){
+        const status=Number(err?.status||0);
+        if(!quiet&&status!==429&&status!==503)tfLogError('Loading notifications failed',err);
+        else if(status===429||status===503)tfLog('warn','Notifications temporarily unavailable; realtime/fallback will retry later',{status});
+        return notificationItems;
+      }finally{notificationFetchPromise=null;}
+    })();
+    return notificationFetchPromise;
   }
+
+  window.teamFlowNotificationsOnVersionChanged=()=>{
+    if(document.hidden)return;
+    fetchNotifications({quiet:true});
+  };
 
   async function markNotificationsRead(ids){
     if(!ids?.length)return;
@@ -198,7 +219,7 @@
 
   function initNotifications(){
     ensureNotificationUi();renderNotifications();
-    clearInterval(notificationPollTimer);notificationPollTimer=setInterval(()=>{if(!document.hidden)fetchNotifications();},6000);
+    clearInterval(notificationPollTimer);notificationPollTimer=setInterval(()=>{if(!document.hidden)fetchNotifications({quiet:true});},NOTIFICATION_FALLBACK_POLL_MS);
     setTimeout(()=>fetchNotifications(),1200);
     window.addEventListener('resize',()=>{if(notificationDropdownOpen)positionNotificationDropdown();});
   }
