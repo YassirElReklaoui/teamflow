@@ -195,7 +195,7 @@
     }
     const text=await response.text();let data={};
     try{data=text?JSON.parse(text):{};}catch(err){tfLogError("API response JSON parsing failed",err,{path,status:response.status,responseText:text.slice(0,500)});data={error:text||`HTTP ${response.status}`};}
-    if(!response.ok){const err=Object.assign(new Error(data.error||`HTTP ${response.status}`),{status:response.status,data});tfLogError("API request failed",err,{path,method,status:response.status});throw err;}
+    if(!response.ok){const err=Object.assign(new Error(data.error||`HTTP ${response.status}`),{status:response.status,code:data.code||"",data});tfLogError("API request failed",err,{path,method,status:response.status,code:data.code||""});throw err;}
     return data;
   }
 
@@ -565,6 +565,12 @@
     }catch(err){
       cloudLastError=String(err?.message||err);tfLogError('Minimal mutation save failed',err,{operations});
       if(isExpiredSessionError(err)){clearCloudToken();cloudReady=false;showAuthGate('Your session expired. Sign in again.');setSyncStatus('error','Sync · sign in required',cloudLastError);}
+      else if(err?.code==='D1_WRITE_BACKED_UP'){
+        deltaDirty=true;
+        setSyncStatus('error','Sync · recovery backup','D1 write failed, but the change was preserved in Google Sheets for recovery.');
+        toast('Change preserved in recovery backup — D1 sync will retry');
+        setTimeout(()=>{if(getCloudToken()&&cloudReady)scheduleRemoteSave({force:true});},15000);
+      }
       else if(isTransientServiceError(err)){
         deltaDirty=true;
         handleTemporaryServiceFailure(err,'Saving changes');
