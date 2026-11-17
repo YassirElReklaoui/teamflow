@@ -7,12 +7,12 @@
   <title>TeamFlow — Team Workspace</title>
   <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261115-workspace-config-1" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-    <script src="./assets/js/services/api.js?v=20261117-r2-docs-1" defer></script>
+    <script src="./assets/js/services/api.js?v=20261117-password-1" defer></script>
   <script src="./assets/js/core/runtime.js?v=20261115-workspace-config-1" defer></script>
   <script src="./assets/js/services/domain.js?v=20261115-workspace-config-1" defer></script>
   <script src="./assets/js/ui/views.js?v=20261115-settings-clearadmin-4" defer></script>
   <script src="./assets/js/ui/editors.js?v=20261115-workspace-config-1" defer></script>
-  <script src="./assets/js/ui/documents.js?v=20261117-r2-docs-1" defer></script>
+  <script src="./assets/js/ui/documents.js?v=20261117-richnote-r2-1" defer></script>
   <script src="./assets/js/ui/notifications.js?v=20261115-settings-clearadmin-4" defer></script>
   <script src="./assets/js/dom/bindings.js?v=20261117-r2-docs-1" defer></script>
   <script src="./assets/js/bootstrap.js?v=20261115-settings-clearadmin-4" defer></script>
@@ -362,6 +362,11 @@
                 </div>
                 <div class="font-size-preview">Preview: TeamFlow keeps the same workspace layout while adjusting your reading size.</div>
               </div>
+            </div>
+            <div class="setting settings-card account-security-settings">
+              <div class="setting-head settings-section-head"><span class="setting-icon green settings-section-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2"/></svg></span><div><h3>Account security</h3><p>Update the password used to sign in to your TeamFlow account.</p></div></div>
+              <div class="note" style="margin-bottom:12px">For security, you will need to enter your current password before choosing a new one.</div>
+              <button class="btn" id="changeOwnPassword" type="button">Change password</button>
             </div>
             <div class="setting settings-card local-settings">
               <div class="setting-head settings-section-head"><span class="setting-icon red settings-section-icon"><svg viewBox="0 0 24 24"><path d="M5 7h14v13H5zM3 4h18v3H3z"/><path d="M9 11h6M12 14v3"/></svg></span><div><h3>Local data</h3><p>Shared project data is stored securely on the team server. This browser keeps only non-sensitive UI preferences.</p></div></div>

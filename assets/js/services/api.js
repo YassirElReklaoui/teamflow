@@ -199,34 +199,6 @@
     return data;
   }
 
-
-  async function cloudFileRequest(path,{method="GET",body,headers={}}={}){
-    if(!apiConfigured())throw Object.assign(new Error("Server URL is not configured"),{status:0});
-    const token=getCloudToken();
-    let response;
-    try{
-      response=await fetch(`${normalizedApiBase(cloudConfig.apiBaseUrl)}${path}`,{
-        method,
-        headers:{...(token?{Authorization:`Bearer ${token}`}:{ }),...headers},
-        body,
-        cache:"no-store"
-      });
-    }catch(fetchErr){
-      const err=Object.assign(new Error("Network unavailable"),{status:0,code:"NETWORK_ERROR",cause:fetchErr});
-      tfLogError("File API network request failed",err,{path,method});
-      throw err;
-    }
-    if(!response.ok){
-      const text=await response.text();let data={};
-      try{data=text?JSON.parse(text):{};}catch(_){data={error:text||`HTTP ${response.status}`};}
-      const err=Object.assign(new Error(data.error||`HTTP ${response.status}`),{status:response.status,data});
-      tfLogError("File API request failed",err,{path,method,status:response.status});
-      throw err;
-    }
-    return response;
-  }
-  window.teamFlowCloudFileRequest=cloudFileRequest;
-
   function showAuthGate(message=""){
     const gate=document.getElementById("teamflowAuthGate");if(!gate)return;
     gate.classList.remove("hidden");
@@ -731,6 +703,44 @@
     });
   }
 
+  function openChangePasswordModal(){
+    if(!cloudUser){toast("Sign in first");return;}
+    const root=document.getElementById("modalRoot");
+    root.innerHTML=`<div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Change password"><div class="modal" style="width:min(520px,calc(100vw - 32px))"><div class="modal-head"><div><h2>Change password</h2><div class="note">Update the password for <b>@${esc(cloudUser.username||"")}</b>.</div></div><button id="closeChangePassword" class="modal-close" type="button">×</button></div><div class="modal-body"><div class="form-grid" style="grid-template-columns:1fr"><div class="field"><label>Current password</label><input id="currentOwnPassword" type="password" autocomplete="current-password" /></div><div class="field"><label>New password</label><input id="newOwnPassword" type="password" autocomplete="new-password" placeholder="At least 10 characters" /></div><div class="field"><label>Confirm new password</label><input id="confirmOwnPassword" type="password" autocomplete="new-password" placeholder="Repeat the new password" /></div></div><div id="changePasswordStatus" class="note" style="margin-top:10px"></div></div><div class="modal-actions"><div class="spacer"></div><button id="cancelChangePassword" class="btn" type="button">Cancel</button><button id="saveOwnPassword" class="btn primary" type="button">Update password</button></div></div></div>`;
+    const close=()=>root.innerHTML="";
+    document.getElementById("closeChangePassword")?.addEventListener("click",close);
+    document.getElementById("cancelChangePassword")?.addEventListener("click",close);
+    root.querySelector(".modal-backdrop")?.addEventListener("click",e=>{if(e.target===e.currentTarget)close();});
+    const submit=async()=>{
+      const currentPassword=document.getElementById("currentOwnPassword")?.value||"";
+      const newPassword=document.getElementById("newOwnPassword")?.value||"";
+      const confirmPassword=document.getElementById("confirmOwnPassword")?.value||"";
+      const status=document.getElementById("changePasswordStatus");
+      const save=document.getElementById("saveOwnPassword");
+      if(newPassword.length<10){if(status)status.textContent="New password must contain at least 10 characters.";return;}
+      if(newPassword!==confirmPassword){if(status)status.textContent="The new passwords do not match.";return;}
+      if(newPassword===currentPassword){if(status)status.textContent="Choose a password different from your current password.";return;}
+      try{
+        if(save){save.disabled=true;save.textContent="Updating…";}
+        if(status)status.textContent="Verifying current password…";
+        const remember=!!localStorage.getItem(CLOUD_REMEMBER_KEY);
+        const data=await cloudRequest("/auth/change-password",{method:"POST",body:{currentPassword,newPassword,remember}});
+        if(data.token)storeCloudToken(data.token,remember);
+        if(data.user)cloudUser=data.user;
+        updateCloudSettingsCard();
+        close();
+        toast("Password updated");
+      }catch(err){
+        tfLogError("Changing password failed",err);
+        if(status)status.textContent=err.message||"Password could not be updated.";
+        if(save){save.disabled=false;save.textContent="Update password";}
+      }
+    };
+    document.getElementById("saveOwnPassword")?.addEventListener("click",submit);
+    ["currentOwnPassword","newOwnPassword","confirmOwnPassword"].forEach(id=>document.getElementById(id)?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();submit();}}));
+    setTimeout(()=>document.getElementById("currentOwnPassword")?.focus(),0);
+  }
+
   function bindCloudUi(){
     const saveConnectionBtn=document.getElementById("tfAuthSaveConnection"),testConnectionBtn=document.getElementById("tfAuthTestConnection"),loginBtn=document.getElementById("tfLoginButton"),setupBtn=document.getElementById("tfSetupButton");
     saveConnectionBtn?.addEventListener("click",()=>{authTooltipAnchor=saveConnectionBtn;saveConnectionFromGate();});
@@ -742,6 +752,7 @@
     document.getElementById("cloudTestConnection")?.addEventListener("click",runCloudSyncCheck);
     document.getElementById("cloudLogout")?.addEventListener("click",cloudLogout);
     document.getElementById("cloudManageUsers")?.addEventListener("click",openCloudUsersModal);
+    document.getElementById("changeOwnPassword")?.addEventListener("click",openChangePasswordModal);
     const profileBtn=document.getElementById("viewAsAvatarBtn");profileBtn?.addEventListener("click",openPersonalProfileModal);profileBtn?.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPersonalProfileModal();}});
   }
 
