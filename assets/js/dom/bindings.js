@@ -386,6 +386,7 @@
   });
 
   $("#addRelease").addEventListener("click",()=>{
+    if(cloudUser?.role!=="admin"){toast("Administrator access required");return;}
     const name=$("#newReleaseName").value.trim();
     if(!name)return;
     if(state.releases.some(r=>r.toLowerCase()===name.toLowerCase())){toast("That release already exists");return;}

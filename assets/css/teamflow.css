@@ -2409,3 +2409,85 @@ html,body,*{
 }
 
 .d1-migration-settings{grid-column:1/-1}.d1-migration-head{align-items:center}.d1-migration-head>.btn{margin-left:auto;white-space:nowrap}.d1-migration-note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--soft);margin:2px 0 14px}.d1-migration-note>span{width:24px;height:24px;border-radius:8px;display:grid;place-items:center;font-weight:900;background:rgba(124,92,255,.12);color:var(--primary)}.d1-migration-note div{display:grid;gap:2px}.d1-migration-note small{color:var(--muted)}.d1-migration-table-wrap{border:1px solid var(--border);border-radius:16px;overflow:auto;max-height:460px}.d1-migration-table{width:100%;border-collapse:collapse;min-width:720px}.d1-migration-table th,.d1-migration-table td{padding:11px 14px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}.d1-migration-table th{position:sticky;top:0;background:var(--card);z-index:1;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.d1-migration-table tbody tr:last-child td{border-bottom:0}.d1-migration-count{font-weight:900;font-variant-numeric:tabular-nums}.d1-migration-status{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:800;background:var(--soft);color:var(--muted)}.d1-migration-status.done{background:rgba(22,163,74,.1);color:#15803d}.d1-migration-status.partial{background:rgba(245,158,11,.12);color:#b45309}.d1-migration-status.empty{background:rgba(100,116,139,.1);color:#64748b}.d1-migrate-btn{min-width:96px;justify-content:center}.d1-migrate-btn[disabled]{opacity:.55;cursor:not-allowed}.d1-migration-empty{text-align:center!important;color:var(--muted);padding:26px!important}.d1-migration-footer{display:flex;justify-content:flex-end;padding-top:10px}@media(max-width:800px){.d1-migration-head{align-items:flex-start}.d1-migration-head>.btn{margin-left:0}.d1-migration-table-wrap{max-height:55vh}}
+
+/* ===== 2026-11-17 Settings hierarchy + admin zone ===== */
+#settingsView .settings-grid{
+  grid-template-areas:
+    "workspace workspace workspace workspace workspace workspace workspace workspace appearance appearance appearance appearance"
+    "security security security security access access access access access access access access"
+    "workflow workflow workflow workflow workflow workflow workflow workflow workflow workflow workflow workflow"
+    "wip wip wip wip wip release release release release release release release"
+    "admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider"
+    "d1backup d1backup d1backup d1backup d1backup d1backup d1backup d1backup d1backup d1backup d1backup d1backup"
+    "backup backup backup backup backup backup backup backup backup backup backup backup"
+    "local local local local local local local local local local local local"!important;
+  align-items:start!important;
+}
+#settingsView .workspace-identity-settings{grid-area:workspace!important}
+#settingsView .appearance-settings{grid-area:appearance!important}
+#settingsView .account-security-settings{grid-area:security!important}
+#settingsView .cloud-settings{grid-area:access!important}
+#settingsView .workflow-settings{grid-area:workflow!important}
+#settingsView .wip-settings{grid-area:wip!important}
+#settingsView .release-settings{grid-area:release!important}
+#settingsView .settings-admin-divider{grid-area:admin-divider!important;display:flex;align-items:center;gap:12px;margin:5px 2px -1px;color:var(--muted);font-size:calc(11px + var(--app-font-delta,0px));font-weight:900;text-transform:uppercase;letter-spacing:.09em}
+#settingsView .settings-admin-divider span{height:1px;flex:1;background:linear-gradient(90deg,transparent,var(--border))}
+#settingsView .settings-admin-divider span:last-child{background:linear-gradient(90deg,var(--border),transparent)}
+#settingsView .d1-backup-settings{grid-area:d1backup!important}
+#settingsView .backup-settings{grid-area:backup!important}
+#settingsView .local-settings{grid-area:local!important}
+#settingsView .workspace-identity-settings,
+#settingsView .account-security-settings,
+#settingsView .appearance-settings,
+#settingsView .cloud-settings{min-height:100%}
+#settingsView .workspace-identity-settings .workspace-identity-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+#settingsView.is-non-admin .workspace-identity-settings{display:block!important}
+#settingsView.is-non-admin .workspace-identity-settings .workspace-identity-actions{justify-content:flex-start}
+#settingsView.is-non-admin .workspace-identity-settings input:disabled,
+#settingsView.is-non-admin .workspace-identity-settings select:disabled,
+#settingsView.is-non-admin .wip-settings input:disabled{opacity:1;color:var(--text);background:color-mix(in srgb,var(--panel-2) 86%,var(--panel));cursor:default}
+#settingsView.is-non-admin .release-settings .release-create-box,
+#settingsView.is-non-admin .release-settings .release-card-actions{display:none!important}
+#settingsView.is-non-admin .settings-admin-divider,
+#settingsView.is-non-admin .d1-backup-settings,
+#settingsView.is-non-admin .backup-settings,
+#settingsView.is-non-admin .local-settings{display:none!important}
+#settingsView.is-non-admin .settings-grid{
+  grid-template-areas:
+    "workspace workspace workspace workspace workspace workspace workspace workspace appearance appearance appearance appearance"
+    "security security security security access access access access access access access access"
+    "workflow workflow workflow workflow workflow workflow workflow workflow workflow workflow workflow workflow"
+    "wip wip wip wip wip release release release release release release release"!important;
+}
+@media(max-width:1050px){
+  #settingsView .settings-grid,
+  #settingsView.is-non-admin .settings-grid{
+    grid-template-columns:1fr 1fr!important;
+    grid-template-areas:
+      "workspace workspace"
+      "appearance security"
+      "access access"
+      "workflow workflow"
+      "wip release"
+      "admin-divider admin-divider"
+      "d1backup d1backup"
+      "backup backup"
+      "local local"!important;
+  }
+  #settingsView.is-non-admin .settings-grid{
+    grid-template-areas:
+      "workspace workspace"
+      "appearance security"
+      "access access"
+      "workflow workflow"
+      "wip release"!important;
+  }
+}
+@media(max-width:720px){
+  #settingsView .settings-grid,
+  #settingsView.is-non-admin .settings-grid{
+    grid-template-columns:1fr!important;
+    grid-template-areas:"workspace" "appearance" "security" "access" "workflow" "wip" "release" "admin-divider" "d1backup" "backup" "local"!important;
+  }
+  #settingsView.is-non-admin .settings-grid{grid-template-areas:"workspace" "appearance" "security" "access" "workflow" "wip" "release"!important}
+}

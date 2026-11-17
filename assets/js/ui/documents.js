@@ -185,6 +185,7 @@
   function renderReleaseEditor(){
     const el=$("#releaseEditor"); if(!el) return;
     ensureAdvancedState();
+    const isAdmin=cloudUser?.role==="admin";
     const releases=state.releases||[];
     const counts={active:0,hidden:0,archived:0};
     releases.forEach(r=>{const v=releaseVisibility(r);counts[v]=(counts[v]||0)+1;});
@@ -217,7 +218,7 @@
         </div>
         <div class="release-card-foot">
           <div class="release-card-impact"><span class="release-impact-dot"></span>${used?`${used} ticket${used===1?'':'s'} linked`:'No tickets linked'}</div>
-          <div class="release-card-actions">${actions}<button class="release-action danger" type="button" data-remove-release="${i}">Remove</button></div>
+          <div class="release-card-actions" ${isAdmin?'':'style="display:none"'}>${actions}<button class="release-action danger" type="button" data-remove-release="${i}">Remove</button></div>
         </div>
       </article>`;
     }).join('');
@@ -226,8 +227,9 @@
       <div class="release-overview-item hidden"><span></span><b>${counts.hidden||0}</b><small>Hidden</small></div>
       <div class="release-overview-item archived"><span></span><b>${counts.archived||0}</b><small>Archived</small></div>
     </div><div class="release-card-grid">${cards||'<div class="release-empty-state"><b>No milestones yet</b><span>Create the first release above.</span></div>'}</div>`;
-    $$('[data-release-action]').forEach(btn=>btn.addEventListener('click',()=>{const name=btn.dataset.releaseName;const next=btn.dataset.releaseAction;setReleaseVisibility(name,next);saveState();renderReleaseEditor();renderMemberSelects();renderBoard();toast(`${name} is now ${next}`);}));
+    $$('[data-release-action]').forEach(btn=>btn.addEventListener('click',()=>{if(!isAdmin){toast('Administrator access required');return;}const name=btn.dataset.releaseName;const next=btn.dataset.releaseAction;setReleaseVisibility(name,next);saveState();renderReleaseEditor();renderMemberSelects();renderBoard();toast(`${name} is now ${next}`);}));
     $$('[data-remove-release]').forEach(btn=>btn.addEventListener('click',async()=>{
+      if(!isAdmin){toast('Administrator access required');return;}
       const index=Number(btn.dataset.removeRelease);
       const r=state.releases[index];
       const used=state.tickets.filter(t=>t.release===r);

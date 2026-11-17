@@ -2,7 +2,7 @@
 
 // TeamFlow modular build — generated from the verified granular API runtime.
   function renderWipEditor(){
-    ensureAdvancedState();const el=$("#wipEditor");if(!el)return;el.innerHTML=state.statuses.map(status=>`<div class="wip-row"><label>${esc(status)}</label><input class="control" data-wip-status="${esc(status)}" type="number" min="1" placeholder="No limit" value="${wipLimitFor(status)||''}" /></div>`).join('');$$('[data-wip-status]').forEach(input=>input.addEventListener('change',()=>{const v=Number(input.value);state.wipLimits[input.dataset.wipStatus]=Number.isFinite(v)&&v>0?Math.floor(v):'';saveState();renderBoard();toast(`${input.dataset.wipStatus}: ${wipLimitFor(input.dataset.wipStatus)||'No limit'}`);}));
+    ensureAdvancedState();const el=$("#wipEditor");if(!el)return;const isAdmin=cloudUser?.role==="admin";el.innerHTML=state.statuses.map(status=>`<div class="wip-row"><label>${esc(status)}</label><input class="control" data-wip-status="${esc(status)}" type="number" min="1" placeholder="No limit" value="${wipLimitFor(status)||''}" ${isAdmin?'':'disabled'} /></div>`).join('');$$('[data-wip-status]').forEach(input=>input.addEventListener('change',()=>{if(!isAdmin){toast("Administrator access required");return;}const v=Number(input.value);state.wipLimits[input.dataset.wipStatus]=Number.isFinite(v)&&v>0?Math.floor(v):'';saveState();renderBoard();toast(`${input.dataset.wipStatus}: ${wipLimitFor(input.dataset.wipStatus)||'No limit'}`);}));
   }
 
   function renderOverview(){
