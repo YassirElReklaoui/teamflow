@@ -529,7 +529,7 @@
 
     list.innerHTML=state.documents.map(d=>`
       <button class="doc-item ${d.id===activeDocId?"active":""}" data-doc-id="${esc(d.id)}" type="button">
-        <span>${d.kind==="html"?"⌘":d.kind==="pdf-local"?"PDF":d.kind==="sharepoint"?"W":"＋"}</span>
+        <span>${d.kind==="html"?"⌘":(d.kind==="pdf"||d.kind==="pdf-local")?"PDF":d.kind==="sharepoint"?"W":"＋"}</span>
         <span class="doc-name">${esc(d.name)}</span>
       </button>
     `).join("");
@@ -556,13 +556,23 @@
         subject:doc.name,
         confirmLabel:"Remove document",
         icon:"−",
-        details:[doc.kind==="sharepoint"?"The SharePoint / Word source remains unchanged.":doc.kind==="pdf-local"?"The original PDF file on your device remains unchanged.":doc.kind==="html"?"The original HTML file on your device remains unchanged.":"Any notes stored only in this TeamFlow page will be removed."],
-        warning:doc.kind==="blank"?"Blank-page notes cannot be restored unless they exist in a backup or export.":"The source file itself is not deleted."
+        details:[doc.kind==="sharepoint"?"The SharePoint / Word source remains unchanged.":doc.storageKey?"The stored file will also be removed from TeamFlow file storage.":doc.kind==="pdf-local"?"The original PDF file on your device remains unchanged.":doc.kind==="html"?"The original HTML file on your device remains unchanged.":"Any notes stored only in this TeamFlow page will be removed."],
+        warning:doc.kind==="blank"?"Blank-page notes cannot be restored unless they exist in a backup or export.":doc.storageKey?"This removes the shared file for all TeamFlow users.":"The source file itself is not deleted."
       });
       if(!ok) return;
       if(runtimeDocUrls.has(doc.id)){
         URL.revokeObjectURL(runtimeDocUrls.get(doc.id));
         runtimeDocUrls.delete(doc.id);
+      }
+      if(doc.storageKey){
+        try{
+          await window.teamFlowCloudFileRequest(`/documents/${encodeURIComponent(doc.id)}`,{method:"DELETE"});
+          state.documents=state.documents.filter(d=>d.id!==doc.id);
+          activeDocId=state.documents[0]?.id||null;
+          await loadRemoteWorkspace({quiet:true});
+          renderDocuments();toast(`${doc.name} removed`);
+        }catch(err){tfLogError("Document delete failed",err,{documentId:doc.id});toast(err?.message||"Could not remove document");}
+        return;
       }
       state.documents=state.documents.filter(d=>d.id!==doc.id);
       activeDocId=state.documents[0]?.id||null;
@@ -570,7 +580,28 @@
     });
 
     const content=$("#docContent");
-    if(doc.kind==="html"){
+    if(doc.storageKey && (doc.kind==="html"||doc.kind==="pdf")){
+      content.innerHTML=`<div class="doc-empty">Loading ${doc.kind.toUpperCase()}…</div>`;
+      (async()=>{
+        try{
+          let objectUrl=runtimeDocUrls.get(doc.id);
+          if(!objectUrl){
+            const response=await window.teamFlowCloudFileRequest(`/documents/${encodeURIComponent(doc.id)}/content`);
+            const blob=await response.blob();
+            objectUrl=URL.createObjectURL(blob);
+            runtimeDocUrls.set(doc.id,objectUrl);
+          }
+          if(activeDocId!==doc.id)return;
+          const current=$("#docContent");if(!current)return;
+          current.innerHTML=doc.kind==="html"
+            ? `<iframe sandbox="allow-forms allow-scripts allow-modals" src="${esc(objectUrl)}" title="${esc(doc.name)}"></iframe>`
+            : `<iframe src="${esc(objectUrl)}" title="${esc(doc.name)}"></iframe>`;
+        }catch(err){
+          tfLogError("Document preview failed",err,{documentId:doc.id});
+          if(activeDocId===doc.id&&$("#docContent"))$("#docContent").innerHTML=`<div class="doc-empty">Could not load this document. ${esc(err?.message||"")}</div>`;
+        }
+      })();
+    }else if(doc.kind==="html"){
       content.innerHTML=`<iframe sandbox="allow-forms allow-scripts allow-modals" title="${esc(doc.name)}"></iframe>`;
       $("iframe",content).srcdoc=doc.html||"";
     }else if(doc.kind==="pdf-local"){

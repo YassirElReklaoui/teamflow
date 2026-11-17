@@ -342,22 +342,37 @@
     }
   });
 
+  async function uploadWorkspaceDocument(file,expectedKind,input){
+    if(!file)return;
+    const maxBytes=20*1024*1024;
+    const lower=String(file.name||"").toLowerCase();
+    const actualKind=(file.type==="application/pdf"||lower.endsWith(".pdf"))?"pdf":((file.type==="text/html"||lower.endsWith(".html")||lower.endsWith(".htm"))?"html":"");
+    if(actualKind!==expectedKind){toast(`Please select a ${expectedKind.toUpperCase()} file`);if(input)input.value="";return;}
+    if(file.size>maxBytes){toast("File is too large. Maximum size is 20 MB");if(input)input.value="";return;}
+    try{
+      toast(`Uploading ${file.name}…`);
+      const form=new FormData();form.append("file",file,file.name);form.append("name",file.name);
+      const response=await window.teamFlowCloudFileRequest("/documents/upload",{method:"POST",body:form});
+      const data=await response.json();
+      activeDocId=data.document?.id||activeDocId;
+      await loadRemoteWorkspace({quiet:true});
+      if(data.document?.id)activeDocId=data.document.id;
+      renderDocuments();
+      toast(`${file.name} uploaded`);
+    }catch(err){
+      tfLogError("Document upload failed",err,{name:file.name,size:file.size,type:file.type});
+      toast(err?.message||"Document upload failed");
+    }finally{if(input)input.value="";}
+  }
+
   $("#htmlUpload").addEventListener("change",async e=>{
-    const file=e.target.files[0];if(!file)return;
-    const html=await file.text();
-    addDocument({id:"d"+Date.now(),name:file.name,kind:"html",html});
-    e.target.value="";
+    const input=e.currentTarget;
+    await uploadWorkspaceDocument(input.files?.[0],"html",input);
   });
 
-  $("#pdfUpload").addEventListener("change",e=>{
-    const file=e.target.files[0];if(!file)return;
-    const id="d"+Date.now();
-    const url=URL.createObjectURL(file);
-    runtimeDocUrls.set(id,url);
-    state.documents.push({id,name:file.name,kind:"pdf-local"});
-    activeDocId=id;
-    renderDocuments();
-    e.target.value="";
+  $("#pdfUpload").addEventListener("change",async e=>{
+    const input=e.currentTarget;
+    await uploadWorkspaceDocument(input.files?.[0],"pdf",input);
   });
 
   $("#addWordLink").addEventListener("click",openSharePointModal);
