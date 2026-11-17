@@ -684,7 +684,7 @@
     [document.getElementById("addStatus"),document.getElementById("addWorkflowStep"),document.getElementById("settingsBackupShortcut"),document.getElementById("createBackupNow")].forEach(el=>{if(el)el.style.display=isAdmin?"inline-flex":"none";});
     const settingsView=document.getElementById("settingsView");if(settingsView)settingsView.classList.toggle("is-non-admin",!isAdmin);
     const localDataCard=document.querySelector("#settingsView .local-settings");if(localDataCard)localDataCard.style.display=isAdmin?"":"none";
-    const workspaceCard=document.querySelector("#settingsView .workspace-identity-settings");if(workspaceCard)workspaceCard.style.display=isAdmin?"":"none";const d1Card=document.querySelector("#settingsView .d1-migration-settings");if(d1Card)d1Card.style.display=isAdmin?"":"none";if(isAdmin&&!d1MigrationLoaded&&!d1MigrationLoading)setTimeout(()=>loadD1MigrationStatus(),0);
+    const workspaceCard=document.querySelector("#settingsView .workspace-identity-settings");if(workspaceCard)workspaceCard.style.display=isAdmin?"":"none";const d1BackupCard=document.querySelector("#settingsView .d1-backup-settings");if(d1BackupCard)d1BackupCard.style.display=isAdmin?"":"none";
     const workspaceFields=[document.getElementById("workspaceDisplayName"),document.getElementById("workspaceTicketPrefix"),document.getElementById("workspaceFallbackPoll")];workspaceFields.forEach(el=>{if(el)el.disabled=!isAdmin;});
     const workspaceSave=document.getElementById("saveWorkspaceIdentity");if(workspaceSave)workspaceSave.style.display=isAdmin?"inline-flex":"none";
     const workspaceReadOnly=document.getElementById("workspaceIdentityReadOnly");if(workspaceReadOnly)workspaceReadOnly.classList.toggle("hidden",isAdmin);
@@ -791,6 +791,14 @@
     catch(err){tfLogError(`Migrating ${dataset} failed`,err);if(summary)summary.textContent=err.message||`${D1_MIGRATION_LABELS[dataset]} migration failed.`;toast(`${D1_MIGRATION_LABELS[dataset]} migration failed`);}
     finally{d1MigrationBusy="";renderD1MigrationRows();}
   }
+  async function backupD1ToSheetsNow(){
+    if(cloudUser?.role!=="admin")return;
+    const btn=document.getElementById("backupD1ToSheetsNow"),status=document.getElementById("d1BackupStatus");
+    try{if(btn){btn.disabled=true;btn.textContent="Backing up…";}if(status)status.textContent="Writing the current D1 snapshot to Google Sheets…";const data=await cloudRequest("/admin/backup-to-sheets",{method:"POST",body:{}});if(status)status.textContent=`Backup completed ${data.backedUpAt||""} · ${Number(data.tables||0)} ranges · no Google reads.`;toast("Google Sheets backup completed");}
+    catch(err){tfLogError("D1 backup to Sheets failed",err);if(status)status.textContent=err.message||"Backup failed";toast("Backup failed");}
+    finally{if(btn){btn.disabled=false;btn.textContent="Backup now";}}
+  }
+
   function bindCloudUi(){
     const saveConnectionBtn=document.getElementById("tfAuthSaveConnection"),testConnectionBtn=document.getElementById("tfAuthTestConnection"),loginBtn=document.getElementById("tfLoginButton"),setupBtn=document.getElementById("tfSetupButton");
     saveConnectionBtn?.addEventListener("click",()=>{authTooltipAnchor=saveConnectionBtn;saveConnectionFromGate();});
@@ -802,7 +810,7 @@
     document.getElementById("cloudTestConnection")?.addEventListener("click",runCloudSyncCheck);
     document.getElementById("cloudLogout")?.addEventListener("click",cloudLogout);
     document.getElementById("cloudManageUsers")?.addEventListener("click",openCloudUsersModal);
-    document.getElementById("changeOwnPassword")?.addEventListener("click",openChangePasswordModal);document.getElementById("refreshD1Migration")?.addEventListener("click",()=>loadD1MigrationStatus());
+    document.getElementById("changeOwnPassword")?.addEventListener("click",openChangePasswordModal);document.getElementById("backupD1ToSheetsNow")?.addEventListener("click",backupD1ToSheetsNow);
     const profileBtn=document.getElementById("viewAsAvatarBtn");profileBtn?.addEventListener("click",openPersonalProfileModal);profileBtn?.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPersonalProfileModal();}});
   }
 
