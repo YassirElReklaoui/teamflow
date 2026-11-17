@@ -690,7 +690,7 @@
     [document.getElementById("addStatus"),document.getElementById("addWorkflowStep"),document.getElementById("settingsBackupShortcut"),document.getElementById("createBackupNow")].forEach(el=>{if(el)el.style.display=isAdmin?"inline-flex":"none";});
     const settingsView=document.getElementById("settingsView");if(settingsView)settingsView.classList.toggle("is-non-admin",!isAdmin);
     const localDataCard=document.querySelector("#settingsView .local-settings");if(localDataCard)localDataCard.style.display=isAdmin?"":"none";
-    const workspaceCard=document.querySelector("#settingsView .workspace-identity-settings");if(workspaceCard)workspaceCard.style.display="";
+    const workspaceCard=document.querySelector("#settingsView .workspace-identity-settings");if(workspaceCard)workspaceCard.style.display=isAdmin?"":"none";
     const d1BackupCard=document.querySelector("#settingsView .d1-backup-settings");if(d1BackupCard)d1BackupCard.style.display=isAdmin?"":"none";
     const adminDivider=document.querySelector("#settingsView .settings-admin-divider");if(adminDivider)adminDivider.style.display=isAdmin?"flex":"none";
     const workspaceFields=[document.getElementById("workspaceDisplayName"),document.getElementById("workspaceTicketPrefix"),document.getElementById("workspaceFallbackPoll")];workspaceFields.forEach(el=>{if(el)el.disabled=!isAdmin;});
@@ -698,7 +698,6 @@
     const releaseCreate=document.querySelector("#settingsView .release-create-box");if(releaseCreate)releaseCreate.style.display=isAdmin?"":"none";
     document.querySelectorAll("#settingsView .release-card-actions").forEach(el=>{el.style.display=isAdmin?"":"none";});
     const workspaceSave=document.getElementById("saveWorkspaceIdentity");if(workspaceSave)workspaceSave.style.display=isAdmin?"inline-flex":"none";
-    const workspaceReadOnly=document.getElementById("workspaceIdentityReadOnly");if(workspaceReadOnly)workspaceReadOnly.classList.toggle("hidden",isAdmin);
     applyWorkspaceIdentity();
     const nameInput=document.getElementById("newStatusName");if(nameInput)nameInput.disabled=!isAdmin;
   }

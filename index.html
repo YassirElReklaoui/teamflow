@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
   <title>TeamFlow — Team Workspace</title>
-  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261117-settings-layout-2" />
+  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261117-admin-identity-3" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-    <script src="./assets/js/services/api.js?v=20261117-settings-layout-2" defer></script>
+    <script src="./assets/js/services/api.js?v=20261117-admin-identity-3" defer></script>
   <script src="./assets/js/core/runtime.js?v=20261115-workspace-config-1" defer></script>
   <script src="./assets/js/services/domain.js?v=20261115-workspace-config-1" defer></script>
-  <script src="./assets/js/ui/views.js?v=20261117-settings-layout-2" defer></script>
+  <script src="./assets/js/ui/views.js?v=20261117-admin-identity-3" defer></script>
   <script src="./assets/js/ui/editors.js?v=20261115-workspace-config-1" defer></script>
-  <script src="./assets/js/ui/documents.js?v=20261117-settings-layout-2" defer></script>
+  <script src="./assets/js/ui/documents.js?v=20261117-admin-identity-3" defer></script>
   <script src="./assets/js/ui/notifications.js?v=20261117-notify-docs-scroll-1" defer></script>
-  <script src="./assets/js/dom/bindings.js?v=20261117-settings-layout-2" defer></script>
+  <script src="./assets/js/dom/bindings.js?v=20261117-admin-identity-3" defer></script>
   <script src="./assets/js/bootstrap.js?v=20261115-settings-clearadmin-4" defer></script>
 </head>
 <body>
@@ -336,15 +336,6 @@
             <div class="settings-summary" aria-hidden="true"><span><b id="settingsWorkflowCount">0</b> workflows</span><span><b id="settingsReleaseCount">0</b> releases</span><span><b id="settingsBackupCount">0</b> backups</span></div>
           </div>
           <div class="settings-grid">
-            <div class="setting settings-card settings-wide workspace-identity-settings">
-              <div class="setting-head settings-section-head"><span class="setting-icon blue settings-section-icon"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></svg></span><div><h3>Workspace identity</h3><p>Customize the workspace name, ticket numbering prefix and fallback synchronization interval.</p></div></div>
-              <div class="workspace-identity-grid">
-                <label class="workspace-config-field"><span>Workspace name</span><input id="workspaceDisplayName" class="control" maxlength="100" placeholder="e.g. Product Delivery Workspace" /></label>
-                <label class="workspace-config-field"><span>Ticket prefix</span><input id="workspaceTicketPrefix" class="control" maxlength="12" placeholder="e.g. TASK" /><small>2–12 letters or numbers. New tickets will look like TASK-101.</small></label>
-                <label class="workspace-config-field"><span>Fallback sync</span><select id="workspaceFallbackPoll" class="control" data-no-custom><option value="1">Every 1 minute</option><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option></select><small>Realtime remains primary. This only controls the safety polling interval.</small></label>
-              </div>
-              <div class="workspace-identity-actions"><span id="workspaceIdentityReadOnly" class="note hidden">Only administrators can change workspace identity.</span><button id="saveWorkspaceIdentity" class="btn primary" type="button">Save workspace settings</button></div>
-            </div>
             <div class="setting settings-card appearance-settings">
               <div class="setting-head settings-section-head"><span class="setting-icon purple settings-section-icon"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0 0 18h1.4a2.1 2.1 0 0 0 0-4.2h-1.1a2.3 2.3 0 0 1 0-4.6H16a5 5 0 0 0 5-5A4.2 4.2 0 0 0 16.8 3H12Z"/><circle cx="7.5" cy="9" r="1"/><circle cx="9" cy="6" r="1"/><circle cx="6.5" cy="13" r="1"/><circle cx="11.5" cy="5.2" r="1"/></svg></span><div><h3>Appearance</h3><p>Choose the workspace theme used on this browser.</p></div></div>
               <button class="theme-switch settings-theme-switch" id="settingsTheme" type="button" title="Switch theme" aria-label="Switch theme">
@@ -383,6 +374,22 @@
               <div class="cloud-settings-actions settings-access-actions"><button class="btn" id="cloudTestConnection" type="button"><span>↻</span> Test connection</button><button class="btn primary" id="cloudManageUsers" type="button">Manage members</button><button class="btn danger" id="cloudLogout" type="button">Sign out</button></div>
             </div>
             <div class="settings-admin-divider" aria-hidden="true"><span></span><strong>Administrator controls</strong><span></span></div>
+
+            <div class="setting settings-card settings-wide workspace-identity-settings admin-identity-card">
+              <div class="admin-identity-head">
+                <div class="admin-identity-title">
+                  <span class="setting-icon blue settings-section-icon"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></svg></span>
+                  <div><span class="admin-identity-kicker">Workspace configuration</span><h3>Workspace identity</h3><p>Set the workspace label, ticket prefix and fallback polling interval used across TeamFlow.</p></div>
+                </div>
+                <span class="admin-only-badge">Admin only</span>
+              </div>
+              <div class="workspace-identity-grid admin-identity-grid">
+                <label class="workspace-config-field"><span>Workspace name</span><input id="workspaceDisplayName" class="control" maxlength="100" placeholder="e.g. Product Delivery Workspace" /><small>Displayed across the workspace.</small></label>
+                <label class="workspace-config-field"><span>Ticket prefix</span><input id="workspaceTicketPrefix" class="control" maxlength="12" placeholder="e.g. TASK" /><small>2–12 letters or numbers · example: GIS-101.</small></label>
+                <label class="workspace-config-field"><span>Fallback sync</span><select id="workspaceFallbackPoll" class="control" data-no-custom><option value="1">Every 1 minute</option><option value="5">Every 5 minutes</option><option value="10">Every 10 minutes</option><option value="15">Every 15 minutes</option></select><small>Realtime stays primary; this is only the safety polling interval.</small></label>
+              </div>
+              <div class="workspace-identity-actions admin-identity-actions"><div class="admin-identity-hint">Changes apply to the whole workspace.</div><button id="saveWorkspaceIdentity" class="btn primary" type="button">Save workspace identity</button></div>
+            </div>
             <div class="setting settings-card settings-wide d1-backup-settings">
               <div class="setting-head settings-section-head"><span class="setting-icon teal settings-section-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg></span><div><h3>Database & backup</h3><p>Cloudflare D1 is the live TeamFlow database. Google Sheets is backup-only and is synchronized automatically by the scheduled Worker job.</p></div><button class="btn" id="backupD1ToSheetsNow" type="button">Backup now</button></div>
               <div class="d1-migration-note"><span>✓</span><div><strong>D1 primary storage</strong><small>Normal TeamFlow users no longer read Google Sheets. The backup job writes a complete recovery snapshot without reading the spreadsheet.</small></div></div>
