@@ -185,7 +185,6 @@
   function renderReleaseEditor(){
     const el=$("#releaseEditor"); if(!el) return;
     ensureAdvancedState();
-    const isAdmin=cloudUser?.role==="admin";
     const releases=state.releases||[];
     const counts={active:0,hidden:0,archived:0};
     releases.forEach(r=>{const v=releaseVisibility(r);counts[v]=(counts[v]||0)+1;});
@@ -218,7 +217,7 @@
         </div>
         <div class="release-card-foot">
           <div class="release-card-impact"><span class="release-impact-dot"></span>${used?`${used} ticket${used===1?'':'s'} linked`:'No tickets linked'}</div>
-          <div class="release-card-actions" ${isAdmin?'':'style="display:none"'}>${actions}<button class="release-action danger" type="button" data-remove-release="${i}">Remove</button></div>
+          <div class="release-card-actions">${actions}<button class="release-action danger" type="button" data-remove-release="${i}">Remove</button></div>
         </div>
       </article>`;
     }).join('');
@@ -227,9 +226,8 @@
       <div class="release-overview-item hidden"><span></span><b>${counts.hidden||0}</b><small>Hidden</small></div>
       <div class="release-overview-item archived"><span></span><b>${counts.archived||0}</b><small>Archived</small></div>
     </div><div class="release-card-grid">${cards||'<div class="release-empty-state"><b>No milestones yet</b><span>Create the first release above.</span></div>'}</div>`;
-    $$('[data-release-action]').forEach(btn=>btn.addEventListener('click',()=>{if(!isAdmin){toast('Administrator access required');return;}const name=btn.dataset.releaseName;const next=btn.dataset.releaseAction;setReleaseVisibility(name,next);saveState();renderReleaseEditor();renderMemberSelects();renderBoard();toast(`${name} is now ${next}`);}));
+    $$('[data-release-action]').forEach(btn=>btn.addEventListener('click',()=>{const name=btn.dataset.releaseName;const next=btn.dataset.releaseAction;setReleaseVisibility(name,next);saveState();renderReleaseEditor();renderMemberSelects();renderBoard();toast(`${name} is now ${next}`);}));
     $$('[data-remove-release]').forEach(btn=>btn.addEventListener('click',async()=>{
-      if(!isAdmin){toast('Administrator access required');return;}
       const index=Number(btn.dataset.removeRelease);
       const r=state.releases[index];
       const used=state.tickets.filter(t=>t.release===r);
@@ -250,12 +248,17 @@
     el.innerHTML=backups.length?backups.map(b=>`<article class="backup-card">
       <div class="backup-card-icon">↶</div>
       <div class="backup-card-main"><div class="backup-card-top"><strong>${esc(b.label||'Workspace backup')}</strong><span>${new Date(b.createdAt||b.ts).toLocaleString('en-GB')}</span></div><div class="backup-card-meta"><span>by ${esc(b.createdBy||'admin')}</span><span>${Number(b.counts?.tickets||0)} tickets</span><span>${Number(b.counts?.members||0)} members</span><span>${Number(b.counts?.documents||0)} documents</span></div></div>
-      <button class="btn small" type="button" data-restore-backup-id="${esc(b.id)}">Restore</button>
+      <div class="backup-card-actions"><button class="btn small" type="button" data-restore-backup-id="${esc(b.id)}">Restore</button><button class="btn small backup-delete-btn" type="button" data-delete-backup-id="${esc(b.id)}" aria-label="Delete backup" title="Delete backup"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></button></div>
     </article>`).join(''):'<div class="backup-empty"><span>↶</span><strong>No backups yet</strong><small>Create a full workspace snapshot before major imports, bulk edits or configuration changes.</small></div>';
     $$('[data-restore-backup-id]').forEach(btn=>btn.addEventListener('click',async()=>{
       const b=getBackups().find(x=>String(x.id)===String(btn.dataset.restoreBackupId));if(!b)return;
       const ok=await confirmAction({title:'Restore this backup?',message:'TeamFlow will replace the current shared workspace with this server snapshot.',subject:b.label||new Date(b.createdAt).toLocaleString('en-GB'),confirmLabel:'Restore backup',icon:'↶',details:[new Date(b.createdAt).toLocaleString('en-GB'),`Created by ${b.createdBy||'admin'}`,`${b.counts?.tickets||0} tickets · ${b.counts?.members||0} members`],warning:'Current shared data will be replaced. Create a new backup first if you may need the current state.'});
       if(!ok)return;btn.disabled=true;btn.textContent='Restoring…';try{await restoreWorkspaceBackup(b.id);refreshDataViews();renderTeam();renderStatusEditor();renderReleaseEditor();toast('Workspace restored from backup');}catch(err){tfLogError('Backup restore failed',err,{backupId:b.id});toast('Backup could not be restored');}finally{btn.disabled=false;btn.textContent='Restore';}
+    }));
+    $$('[data-delete-backup-id]').forEach(btn=>btn.addEventListener('click',async()=>{
+      const b=getBackups().find(x=>String(x.id)===String(btn.dataset.deleteBackupId));if(!b)return;
+      const ok=await confirmAction({title:'Delete this backup?',message:'This restore point will be permanently removed from backup history.',subject:b.label||new Date(b.createdAt).toLocaleString('en-GB'),confirmLabel:'Delete backup',icon:'−',warning:'This backup cannot be restored after deletion.'});
+      if(!ok)return;btn.disabled=true;try{await deleteWorkspaceBackup(b.id);toast('Backup deleted');}catch(err){tfLogError('Backup delete failed',err,{backupId:b.id});toast('Backup could not be deleted');}finally{btn.disabled=false;}
     }));
     renderSettingsSummary();
   }

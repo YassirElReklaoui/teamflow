@@ -691,7 +691,6 @@
     const settingsView=document.getElementById("settingsView");if(settingsView)settingsView.classList.toggle("is-non-admin",!isAdmin);
     const localDataCard=document.querySelector("#settingsView .local-settings");if(localDataCard)localDataCard.style.display=isAdmin?"":"none";
     const workspaceCard=document.querySelector("#settingsView .workspace-identity-settings");if(workspaceCard)workspaceCard.style.display=isAdmin?"":"none";
-    const d1BackupCard=document.querySelector("#settingsView .d1-backup-settings");if(d1BackupCard)d1BackupCard.style.display=isAdmin?"":"none";
     const adminDivider=document.querySelector("#settingsView .settings-admin-divider");if(adminDivider)adminDivider.style.display=isAdmin?"flex":"none";
     const workspaceFields=[document.getElementById("workspaceDisplayName"),document.getElementById("workspaceTicketPrefix"),document.getElementById("workspaceFallbackPoll")];workspaceFields.forEach(el=>{if(el)el.disabled=!isAdmin;});
     document.querySelectorAll("#settingsView [data-wip-status]").forEach(el=>{el.disabled=!isAdmin;});
@@ -820,7 +819,7 @@
     document.getElementById("cloudTestConnection")?.addEventListener("click",runCloudSyncCheck);
     document.getElementById("cloudLogout")?.addEventListener("click",cloudLogout);
     document.getElementById("cloudManageUsers")?.addEventListener("click",openCloudUsersModal);
-    document.getElementById("changeOwnPassword")?.addEventListener("click",openChangePasswordModal);document.getElementById("backupD1ToSheetsNow")?.addEventListener("click",backupD1ToSheetsNow);
+    document.getElementById("changeOwnPassword")?.addEventListener("click",openChangePasswordModal);
     const profileBtn=document.getElementById("viewAsAvatarBtn");profileBtn?.addEventListener("click",openPersonalProfileModal);profileBtn?.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPersonalProfileModal();}});
   }
 
@@ -847,8 +846,15 @@
   }
   async function createWorkspaceBackup(label='Manual backup'){
     if(cloudUser?.role!=="admin"){toast('Administrator access required');return null;}
-    try{setSyncStatus('saving','Backup · creating…');const data=await cloudRequest('/admin/backups',{method:'POST',body:{label}});serverBackups=Array.isArray(data.backups)?data.backups:serverBackups;renderBackups();renderSettingsSummary();setSyncStatus('connected','Sync · connected');toast('Workspace backup created');return data.backup||null;}
-    catch(err){tfLogError('Creating workspace backup failed',err);setSyncStatus('error','Backup · failed',err.message);toast('Backup could not be created');return null;}
+    const status=document.getElementById('backupStatus');
+    try{setSyncStatus('saving','Backup · creating…');if(status)status.textContent='Creating a protected restore point…';const data=await cloudRequest('/admin/backups',{method:'POST',body:{label}});serverBackups=Array.isArray(data.backups)?data.backups:serverBackups;if(!Array.isArray(data.backups))await loadBackups({quiet:true});renderBackups();renderSettingsSummary();if(status)status.textContent=data.secondaryCopyOk===false?'Restore point created. The secondary recovery copy could not be refreshed this time.':'Backup created successfully and recovery protection refreshed.';setSyncStatus('connected','Sync · connected');toast('Workspace backup created');return data.backup||null;}
+    catch(err){tfLogError('Creating workspace backup failed',err);if(status)status.textContent=err.message||'Backup failed';setSyncStatus('error','Backup · failed',err.message);toast('Backup could not be created');return null;}
+  }
+  async function deleteWorkspaceBackup(id){
+    if(cloudUser?.role!=="admin")throw new Error('Administrator access required');
+    const data=await cloudRequest(`/admin/backups/${encodeURIComponent(id)}`,{method:'DELETE'});
+    serverBackups=Array.isArray(data.backups)?data.backups:serverBackups.filter(b=>String(b.id)!==String(id));
+    renderBackups();renderSettingsSummary();return data;
   }
   async function restoreWorkspaceBackup(id){
     if(cloudUser?.role!=="admin")throw new Error('Administrator access required');

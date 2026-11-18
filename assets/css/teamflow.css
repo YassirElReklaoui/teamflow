@@ -2542,3 +2542,38 @@ html,body,*{
   #settingsView .admin-identity-actions{align-items:stretch!important;flex-direction:column;padding:0 16px 16px}
   #settingsView .admin-identity-actions .btn{width:100%;min-width:0}
 }
+
+/* ===== 2026-11-18 Settings row + unified backup ===== */
+#settingsView .settings-grid{
+  grid-template-areas:
+    "appearance appearance appearance appearance appearance appearance security security security security security security"
+    "access access access access access access workflow workflow workflow workflow workflow workflow"
+    "wip wip wip wip wip release release release release release release release"
+    "admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider"
+    "workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace"
+    "backup backup backup backup backup backup backup backup backup backup backup backup"
+    "local local local local local local local local local local local local"!important;
+}
+#settingsView.is-non-admin .settings-grid{
+  grid-template-areas:
+    "appearance appearance appearance appearance appearance appearance security security security security security security"
+    "access access access access access access workflow workflow workflow workflow workflow workflow"
+    "wip wip wip wip wip release release release release release release release"!important;
+}
+#settingsView .backup-settings{grid-area:backup!important}
+#settingsView .d1-backup-settings{display:none!important}
+.backup-card-actions{display:flex;align-items:center;gap:7px}
+.backup-delete-btn{width:34px;height:34px;display:grid!important;place-items:center;padding:0!important;border-color:color-mix(in srgb,#ef4444 25%,var(--border))!important;color:#dc2626!important;background:color-mix(in srgb,#fee2e2 22%,var(--panel))!important}
+.backup-delete-btn:hover{background:color-mix(in srgb,#fee2e2 55%,var(--panel))!important}
+.backup-delete-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.backup-status-note{margin:0 0 10px 34px}
+@media(max-width:1050px){
+  #settingsView .settings-grid{grid-template-areas:"appearance security" "access workflow" "wip release" "admin-divider admin-divider" "workspace workspace" "backup backup" "local local"!important}
+  #settingsView.is-non-admin .settings-grid{grid-template-areas:"appearance security" "access workflow" "wip release"!important}
+}
+@media(max-width:720px){
+  #settingsView .settings-grid{grid-template-areas:"appearance" "security" "access" "workflow" "wip" "release" "admin-divider" "workspace" "backup" "local"!important}
+  #settingsView.is-non-admin .settings-grid{grid-template-areas:"appearance" "security" "access" "workflow" "wip" "release"!important}
+  .backup-card-actions{grid-column:1/-1;justify-self:end}
+  .backup-status-note{margin-left:0}
+}
