@@ -2877,3 +2877,158 @@ html,body,*{
   #settingsView .settings-grid{grid-template-columns:1fr!important}
   #settingsView #statusEditor>.workflow-card-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 }
+
+/* =========================================================
+   SETTINGS REFERENCE UI V3 — authoritative layout pass
+   Keeps existing DOM hooks/behavior; fixes ordering + scale.
+   ========================================================= */
+#settingsView{padding:24px 28px 40px!important;background:linear-gradient(180deg,#fafaff 0,#f7f7fc 100%)!important}
+#settingsView .settings-shell{max-width:1320px!important;width:100%!important;margin:0 auto!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important}
+#settingsView .settings-hero{min-height:92px!important;padding:20px 22px!important;border-radius:22px!important;background:linear-gradient(112deg,#faf9ff 0%,#f2edff 60%,#ddd1ff 100%)!important;border:1px solid #e7e0fb!important;box-shadow:0 12px 32px rgba(74,45,145,.08)!important;overflow:hidden!important}
+#settingsView .settings-hero-icon{width:48px!important;height:48px!important;border-radius:15px!important;background:linear-gradient(145deg,#7c3aed,#6d28d9)!important;box-shadow:0 8px 18px rgba(124,58,237,.28)!important}
+#settingsView .settings-hero-copy h2{font-size:25px!important;line-height:1.1!important;letter-spacing:-.025em!important}
+#settingsView .settings-hero-copy p{font-size:12px!important;margin-top:5px!important;color:#62677a!important}
+#settingsView .settings-hero-actions{gap:9px!important}
+#settingsView .settings-hero-btn{height:36px!important;min-height:36px!important;padding:0 14px!important;border-radius:18px!important;font-size:11px!important;font-weight:800!important;background:rgba(255,255,255,.86)!important;border:1px solid rgba(111,82,190,.12)!important;box-shadow:0 4px 12px rgba(63,45,115,.08)!important}
+#settingsView .settings-summary{display:none!important}
+
+#settingsView .settings-grid{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:18px!important;margin-top:20px!important;align-items:start!important}
+#settingsView .settings-card{padding:18px!important;border:1px solid #e3e2ee!important;border-radius:18px!important;background:#fff!important;box-shadow:0 8px 22px rgba(49,45,80,.055)!important;min-width:0!important}
+#settingsView .settings-section-head{display:flex!important;align-items:flex-start!important;gap:12px!important;margin-bottom:14px!important;min-height:44px!important}
+#settingsView .settings-section-icon{width:42px!important;height:42px!important;flex:0 0 42px!important;border-radius:13px!important}
+#settingsView .settings-section-icon svg{width:21px!important;height:21px!important}
+#settingsView .settings-section-head h3{font-size:16px!important;line-height:1.15!important;margin:2px 0 3px!important;letter-spacing:-.01em!important}
+#settingsView .settings-section-head p{font-size:11px!important;line-height:1.35!important;color:#73778a!important}
+#settingsView .btn{font-size:11px!important;font-weight:800!important;border-radius:10px!important}
+#settingsView .btn.primary{background:linear-gradient(135deg,#7c3aed,#6d28d9)!important;box-shadow:0 6px 14px rgba(124,58,237,.22)!important}
+
+/* Correct visual order to match the reference mockup */
+#settingsView .appearance-settings{order:1!important}
+#settingsView .account-security-settings{order:2!important}
+#settingsView .workflow-settings{order:3!important}
+#settingsView .cloud-settings{order:4!important}
+#settingsView .wip-settings{order:5!important}
+#settingsView .release-settings{order:6!important}
+#settingsView .backup-settings{order:7!important}
+#settingsView .settings-admin-divider{order:8!important}
+#settingsView .workspace-identity-settings{order:9!important}
+#settingsView .local-settings{order:10!important}
+
+/* Appearance + security */
+#settingsView .appearance-settings,#settingsView .account-security-settings{min-height:224px!important}
+#settingsView .settings-theme-switch{height:42px!important;border-radius:12px!important;background:#f5f5fa!important;padding:4px!important;margin-top:2px!important}
+#settingsView .settings-theme-switch .theme-side{font-size:12px!important}
+#settingsView .appearance-settings>div[style]{margin-top:14px!important;padding-top:14px!important}
+#settingsView .appearance-settings>div[style]>div:first-child{font-size:12px!important}
+#settingsView .appearance-settings .note{font-size:10px!important}
+#settingsView .font-size-control{gap:8px!important;margin-top:10px!important}
+#settingsView .font-size-option{height:38px!important;border-radius:10px!important;font-size:11px!important}
+#settingsView .font-size-preview{margin-top:10px!important;padding:9px 11px!important;border-radius:10px!important;font-size:10px!important}
+#settingsView .account-security-body{min-height:70px!important;padding:12px 14px!important;border-radius:13px!important;background:#fff!important;border:1px solid #e4e3ee!important}
+#settingsView .account-security-copy strong{font-size:12px!important}
+#settingsView .account-security-copy span{font-size:10px!important;margin-top:3px!important}
+#settingsView .account-security-body .btn{height:38px!important;padding:0 16px!important}
+
+/* Workflow panel — readable reference-sized draggable cards */
+#settingsView .workflow-settings{grid-column:auto!important;min-height:278px!important;padding:18px!important}
+#settingsView .workflow-settings .workflow-head-actions{margin-left:auto!important;gap:8px!important}
+#settingsView .workflow-settings .workflow-head-actions .btn{height:38px!important;padding:0 14px!important;font-size:11px!important}
+#settingsView .settings-info-btn{width:30px!important;height:30px!important;font-size:12px!important}
+#settingsView #statusEditor>.workflow-card-strip{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:8px!important;padding:2px 0 0!important}
+#settingsView .workflow-setting-card{height:154px!important;min-height:154px!important;padding:12px 11px 0!important;border-radius:14px!important;background:#fff!important;border:1px solid #ddddea!important;box-shadow:0 5px 12px rgba(52,48,83,.04)!important}
+#settingsView .workflow-card-icon{width:34px!important;height:34px!important;border-radius:10px!important}
+#settingsView .workflow-card-icon svg{width:17px!important;height:17px!important}
+#settingsView .workflow-card-menu{font-size:17px!important}
+#settingsView .workflow-card-name{font-size:11px!important;line-height:1.2!important;margin-top:9px!important;min-height:28px!important}
+#settingsView .workflow-card-meta{margin-top:6px!important;gap:4px!important}
+#settingsView .workflow-card-count,#settingsView .workflow-card-position{font-size:9px!important;line-height:1.25!important}
+#settingsView .workflow-remove-action{height:29px!important;min-height:29px!important;margin:7px -11px 0!important;font-size:9px!important}
+#settingsView .workflow-order-savebar{min-height:48px!important;margin-top:10px!important;padding:10px 12px!important;border-radius:11px!important;font-size:10px!important}
+
+/* Team access — same height as Workflow, balanced 2-column tiles */
+#settingsView .cloud-settings{min-height:278px!important;padding:18px!important}
+#settingsView .settings-collapse-btn{display:none!important}
+#settingsView .settings-access-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+#settingsView .access-tile{min-height:54px!important;padding:8px 10px!important;border-radius:11px!important;background:#fff!important;border:1px solid #e3e3ed!important}
+#settingsView .access-tile-icon{width:31px!important;height:31px!important;border-radius:9px!important}
+#settingsView .access-tile>div>span:first-child{font-size:8px!important;letter-spacing:.09em!important;color:#777b90!important}
+#settingsView .access-tile b,#settingsView .access-tile code,#settingsView .access-tile>div>span:last-child{font-size:10px!important;line-height:1.25!important}
+#settingsView .settings-access-actions{margin-top:10px!important;padding-top:10px!important;gap:8px!important;border-top:1px solid #ecebf2!important}
+#settingsView .settings-access-actions .btn{height:34px!important;min-height:34px!important;padding:0 11px!important;font-size:9px!important}
+#settingsView #cloudManageUsers{order:-1!important;margin-right:auto!important}
+
+/* WIP + releases */
+#settingsView .wip-settings,#settingsView .release-settings{min-height:250px!important;padding:18px!important}
+#settingsView .wip-editor{grid-template-columns:1fr 1fr!important;gap:8px!important}
+#settingsView .wip-row{min-height:44px!important;padding:7px 9px!important;border-radius:11px!important}
+#settingsView .wip-row label,#settingsView .wip-row strong,#settingsView .wip-row span{font-size:10px!important}
+#settingsView .wip-row input{height:32px!important;min-height:32px!important;border-radius:9px!important;font-size:10px!important}
+#settingsView .release-create-box{padding:10px!important;border-radius:12px!important;margin-bottom:10px!important}
+#settingsView .release-create-copy strong{font-size:10px!important}
+#settingsView .release-create-copy small{font-size:9px!important}
+#settingsView .release-create-controls{gap:7px!important;margin-top:7px!important}
+#settingsView .release-create-controls .control{height:35px!important;min-height:35px!important;font-size:10px!important;border-radius:9px!important}
+#settingsView .release-create-controls .btn{height:35px!important;min-height:35px!important}
+#settingsView .release-editor{gap:7px!important}
+#settingsView .release-card{padding:10px!important;border-radius:11px!important}
+#settingsView .release-card h4,#settingsView .release-card strong{font-size:10px!important}
+#settingsView .release-card small,#settingsView .release-card span{font-size:9px!important}
+#settingsView .release-card-actions .btn{height:29px!important;min-height:29px!important;font-size:9px!important;padding:0 8px!important}
+
+/* Backup — wide card, left snapshot summary + right history */
+#settingsView .backup-settings{grid-column:1/-1!important;display:grid!important;grid-template-columns:300px minmax(0,1fr)!important;grid-template-areas:"backup-head backup-head" "backup-summary backup-list" "backup-status backup-list"!important;gap:12px 18px!important;min-height:300px!important;padding:18px!important}
+#settingsView .backup-setting-head{grid-area:backup-head!important;margin:0!important;padding-bottom:12px!important;border-bottom:1px solid #ecebf3!important}
+#settingsView .backup-create-btn{height:38px!important;min-height:38px!important;padding:0 15px!important}
+#settingsView .backup-safety-note{grid-area:backup-summary!important;min-height:170px!important;padding:18px!important;border-radius:15px!important;background:linear-gradient(145deg,#fbf9ff,#f3edff)!important;border:1px solid #e5dcfb!important;text-align:center!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important}
+#settingsView .backup-safety-note>span{width:58px!important;height:58px!important;border-radius:18px!important;font-size:26px!important;margin:0 0 10px!important}
+#settingsView .backup-safety-note strong{font-size:13px!important}
+#settingsView .backup-safety-note small{font-size:9px!important;line-height:1.45!important;max-width:230px!important}
+#settingsView .backup-status-note{grid-area:backup-status!important;font-size:9px!important;text-align:center!important;padding:0 8px!important}
+#settingsView .backup-list{grid-area:backup-list!important;gap:8px!important;align-content:start!important}
+#settingsView .backup-list:before{content:"Backup history";display:block;font-size:13px;font-weight:900;color:#27233a;margin-bottom:2px;padding:1px 2px 4px}
+#settingsView .backup-card{min-height:54px!important;padding:8px 10px!important;border-radius:11px!important;grid-template-columns:34px minmax(0,1fr) auto auto!important;gap:9px!important;background:#fff!important;border:1px solid #e4e3ee!important}
+#settingsView .backup-card-icon{width:33px!important;height:33px!important;border-radius:10px!important}
+#settingsView .backup-card-title{font-size:10px!important}
+#settingsView .backup-card-meta{font-size:8px!important;gap:6px!important}
+#settingsView .backup-card>.btn{height:30px!important;min-height:30px!important;padding:0 9px!important;font-size:9px!important}
+#settingsView .backup-delete-btn{width:30px!important;min-width:30px!important;padding:0!important}
+
+/* Admin divider + identity below backup, like the reference */
+#settingsView .settings-admin-divider{grid-column:1/-1!important;display:flex!important;align-items:center!important;gap:12px!important;margin:1px 0 -2px!important;font-size:9px!important;letter-spacing:.13em!important;color:#7651dc!important}
+#settingsView .settings-admin-divider span{height:1px!important;background:#ddd5f7!important;flex:1!important}
+#settingsView .admin-identity-card{grid-column:1/-1!important;border-radius:17px!important;padding:0!important;background:linear-gradient(180deg,#fcfaff,#f8f4ff)!important;border:1px solid #dcd1fb!important}
+#settingsView .admin-identity-head{padding:14px 16px 10px!important}
+#settingsView .admin-identity-title .settings-section-icon{width:38px!important;height:38px!important;flex-basis:38px!important}
+#settingsView .admin-identity-kicker{font-size:8px!important;margin-bottom:2px!important}
+#settingsView .admin-identity-title h3{font-size:14px!important;margin:0 0 2px!important}
+#settingsView .admin-identity-title p{font-size:9px!important}
+#settingsView .admin-only-badge{min-height:26px!important;padding:4px 10px!important;font-size:8px!important}
+#settingsView .admin-identity-grid{grid-template-columns:minmax(0,1.45fr) minmax(190px,.55fr) minmax(220px,.7fr)!important;gap:10px!important;padding:10px 16px 8px!important}
+#settingsView .admin-identity-grid .workspace-config-field{gap:5px!important}
+#settingsView .admin-identity-grid .workspace-config-field>span{font-size:9px!important}
+#settingsView .admin-identity-grid .workspace-config-field small{font-size:8px!important}
+#settingsView .admin-identity-grid .control{height:36px!important;min-height:36px!important;border-radius:9px!important;font-size:10px!important}
+#settingsView .admin-identity-actions{padding:2px 16px 14px!important;min-height:38px!important}
+#settingsView .admin-identity-hint{font-size:8px!important}
+#settingsView .admin-identity-actions .btn{min-width:152px!important;height:36px!important;min-height:36px!important}
+
+/* Destructive local-data card remains last and visually secondary */
+#settingsView .local-settings{grid-column:1/-1!important;padding:14px 16px!important;border-color:#f1d8df!important;background:#fffafb!important}
+#settingsView .local-settings .settings-section-head{margin-bottom:9px!important}
+#settingsView .local-settings .btn{height:34px!important;min-height:34px!important;width:auto!important;padding:0 14px!important}
+
+@media(max-width:1180px){
+  #settingsView .settings-shell{max-width:100%!important}
+  #settingsView #statusEditor>.workflow-card-strip{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  #settingsView .workflow-setting-card{height:145px!important;min-height:145px!important}
+}
+@media(max-width:900px){
+  #settingsView{padding:16px!important}
+  #settingsView .settings-grid{grid-template-columns:1fr!important}
+  #settingsView .backup-settings{grid-template-columns:1fr!important;grid-template-areas:"backup-head" "backup-summary" "backup-list" "backup-status"!important}
+  #settingsView .admin-identity-grid{grid-template-columns:1fr!important}
+}
+@media(max-width:620px){
+  #settingsView .settings-hero-actions{display:none!important}
+  #settingsView #statusEditor>.workflow-card-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
