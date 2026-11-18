@@ -2577,3 +2577,34 @@ html,body,*{
   .backup-card-actions{grid-column:1/-1;justify-self:end}
   .backup-status-note{margin-left:0}
 }
+
+/* ===== 2026-11-18 Settings exact 4-part desktop layout ===== */
+@media (min-width: 1101px){
+  #settingsView .settings-grid{
+    display:grid!important;
+    grid-template-columns:repeat(12,minmax(0,1fr))!important;
+    grid-template-areas:
+      "appearance appearance appearance security security security access access access access access access"
+      "wip wip wip release release release workflow workflow workflow workflow workflow workflow"
+      "backup backup backup backup backup backup backup backup backup local local local"
+      "admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider"
+      "workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace"!important;
+    align-items:stretch!important;
+  }
+  #settingsView .appearance-settings{grid-area:appearance!important}
+  #settingsView .account-security-settings{grid-area:security!important}
+  #settingsView .cloud-settings{grid-area:access!important}
+  #settingsView .wip-settings{grid-area:wip!important}
+  #settingsView .release-settings{grid-area:release!important}
+  #settingsView .workflow-settings{grid-area:workflow!important}
+  #settingsView .backup-settings{grid-area:backup!important}
+  #settingsView .local-settings{grid-area:local!important}
+  #settingsView .settings-admin-divider{grid-area:admin-divider!important}
+  #settingsView .workspace-identity-settings{grid-area:workspace!important}
+
+  #settingsView.is-non-admin .settings-grid{
+    grid-template-areas:
+      "appearance appearance appearance security security security access access access access access access"
+      "wip wip wip release release release workflow workflow workflow workflow workflow workflow"!important;
+  }
+}
