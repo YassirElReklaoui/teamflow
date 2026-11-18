@@ -2577,3 +2577,163 @@ html,body,*{
   .backup-card-actions{grid-column:1/-1;justify-self:end}
   .backup-status-note{margin-left:0}
 }
+
+/* ===== Settings mockup fidelity pass — 2026-11-18 ===== */
+#settingsView{--settings-purple:#6d36f2;--settings-purple-2:#8b5cf6;--settings-ink:#172033;--settings-line:#e7e2f3;--settings-soft:#f8f7ff}
+#settingsView .settings-shell{padding:0!important;background:transparent!important;box-shadow:none!important;border:0!important}
+#settingsView .settings-shell:before{display:none!important}
+#settingsView .settings-hero{position:relative;overflow:hidden;display:flex!important;align-items:center!important;min-height:106px!important;padding:22px 26px!important;margin:0 0 18px!important;border:1px solid #e8e3f5!important;border-radius:22px!important;background:linear-gradient(118deg,#fbfaff 0%,#f4efff 56%,#eee7ff 100%)!important;box-shadow:0 12px 30px rgba(67,45,125,.07)!important}
+#settingsView .settings-hero:before,#settingsView .settings-hero:after{content:"";position:absolute;pointer-events:none;border-radius:50% 10% 50% 10%;transform:rotate(-12deg)}
+#settingsView .settings-hero:before{width:410px;height:118px;right:-60px;top:-24px;background:linear-gradient(135deg,rgba(113,55,242,.06),rgba(113,55,242,.26));filter:blur(.2px)}
+#settingsView .settings-hero:after{width:335px;height:86px;right:-8px;bottom:-42px;background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(109,54,242,.23));transform:rotate(-8deg)}
+#settingsView .settings-hero-icon{position:relative;z-index:1;width:58px!important;height:58px!important;flex:0 0 58px!important;border-radius:18px!important;background:linear-gradient(145deg,#7b3ff2,#5f2ee8)!important;box-shadow:0 12px 28px rgba(109,54,242,.27)!important}
+#settingsView .settings-hero-icon svg{width:27px!important;height:27px!important}
+#settingsView .settings-hero-copy{position:relative;z-index:1}
+#settingsView .settings-hero-copy h2{font-size:27px!important;letter-spacing:-.04em!important;color:#182033!important}
+#settingsView .settings-hero-copy p{font-size:12px!important;color:#697386!important;max-width:620px}
+#settingsView .settings-hero-actions{position:relative;z-index:1;margin-left:auto!important}
+#settingsView .settings-hero-btn{height:36px!important;padding:7px 12px!important;border-radius:999px!important;background:rgba(255,255,255,.78)!important;border-color:#e2dcf1!important;box-shadow:0 5px 14px rgba(74,52,125,.05)!important}
+#settingsView .settings-grid{grid-template-columns:repeat(12,minmax(0,1fr))!important;gap:16px!important;grid-template-areas:
+  "appearance appearance appearance appearance appearance appearance security security security security security security"
+  "workflow workflow workflow workflow workflow workflow access access access access access access"
+  "wip wip wip wip wip wip release release release release release release"
+  "backup backup backup backup backup backup backup backup backup backup backup backup"
+  "admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider"
+  "workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace"
+  "local local local local local local local local local local local local"!important}
+#settingsView.is-non-admin .settings-grid{grid-template-areas:
+  "appearance appearance appearance appearance appearance appearance security security security security security security"
+  "workflow workflow workflow workflow workflow workflow access access access access access access"
+  "wip wip wip wip wip wip release release release release release release"!important}
+#settingsView .settings-card{border:1px solid #e7e2f1!important;border-radius:20px!important;background:rgba(255,255,255,.95)!important;padding:18px!important;box-shadow:0 10px 28px rgba(44,38,86,.055)!important;transform:none!important}
+[data-theme="dark"] #settingsView .settings-card{background:var(--panel)!important;border-color:var(--border)!important}
+#settingsView .settings-card:hover{transform:none!important;box-shadow:0 12px 30px rgba(44,38,86,.07)!important}
+#settingsView .settings-section-head{min-height:48px;margin-bottom:14px!important}
+#settingsView .settings-section-head>div{min-width:0}
+#settingsView .settings-section-head h3{font-size:15px!important;letter-spacing:-.02em!important;color:#1d2433}
+[data-theme="dark"] #settingsView .settings-section-head h3{color:var(--text)}
+#settingsView .settings-section-head p{font-size:10px!important;color:#737b8c!important;line-height:1.45!important}
+#settingsView .settings-section-icon{width:42px!important;height:42px!important;flex-basis:42px!important;border-radius:14px!important;box-shadow:none!important}
+#settingsView .appearance-settings{grid-area:appearance;background:#fff!important}
+#settingsView .account-security-settings{grid-area:security;background:linear-gradient(145deg,#fff,#f7fffb)!important}
+#settingsView .workflow-settings{grid-area:workflow;background:linear-gradient(145deg,#fff,#fbf9ff)!important}
+#settingsView .cloud-settings{grid-area:access;background:linear-gradient(145deg,#fff,#fcfbff)!important}
+#settingsView .wip-settings{grid-area:wip;background:linear-gradient(145deg,#fff,#fffdfa)!important}
+#settingsView .release-settings{grid-area:release;background:linear-gradient(145deg,#fff,#f6fffb)!important}
+#settingsView .backup-settings{grid-area:backup;background:linear-gradient(145deg,#fff,#fbfaff)!important}
+#settingsView .workspace-identity-settings{grid-area:workspace}
+#settingsView .local-settings{grid-area:local}
+
+/* Appearance, like the reference segmented control */
+#settingsView .appearance-settings .settings-theme-switch{width:100%!important;height:40px!important;margin-top:4px!important;border:0!important;border-radius:12px!important;background:#f4f5f8!important;padding:4px!important;display:grid!important;grid-template-columns:1fr 1fr!important;gap:5px!important;box-shadow:none!important}
+#settingsView .appearance-settings .settings-theme-switch .theme-side{width:auto!important;height:32px!important;border-radius:9px!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:7px!important}
+#settingsView .appearance-settings .settings-theme-switch .theme-side:after{font-size:11px;font-weight:850;color:#556070}
+#settingsView .appearance-settings .settings-theme-switch .theme-sun:after{content:"Light"}
+#settingsView .appearance-settings .settings-theme-switch .theme-moon:after{content:"Dark"}
+#settingsView .appearance-settings .settings-theme-switch .theme-side svg{width:16px!important;height:16px!important}
+[data-theme="light"] #settingsView .appearance-settings .settings-theme-switch .theme-sun,[data-theme="dark"] #settingsView .appearance-settings .settings-theme-switch .theme-moon{background:#fff!important;color:#6d36f2!important;box-shadow:0 4px 12px rgba(59,44,102,.1)!important}
+#settingsView .font-size-control{gap:8px!important;margin-top:10px!important}
+#settingsView .font-size-option{height:38px!important;border-radius:11px!important;background:#fafafe!important}
+#settingsView .font-size-option.active{background:#f4efff!important;border-color:#8b5cf6!important;color:#6d36f2!important;box-shadow:inset 0 0 0 1px #8b5cf6}
+#settingsView .font-size-preview{border-radius:10px!important;background:#f0eaff!important;color:#6f6681!important;padding:8px 10px!important}
+
+/* Security */
+#settingsView .account-security-body{min-height:64px!important;padding:11px 12px!important;border:1px solid #e9e4f1!important;border-radius:14px!important;background:#fff!important}
+#settingsView .account-security-copy strong{font-size:12px!important}
+#settingsView .account-security-copy span{font-size:10px!important;color:#7a8391!important}
+#settingsView .account-security-body .btn{height:36px!important;border-radius:10px!important;padding:0 15px!important}
+
+/* Workflow cards — keep drag/drop DOM exactly intact */
+#settingsView #statusEditor>.workflow-card-strip{grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:8px!important}
+#settingsView .workflow-setting-card{min-height:166px!important;padding:13px 12px 0!important;border:1px solid #e7e3ef!important;border-radius:15px!important;background:#fff!important;box-shadow:0 6px 16px rgba(46,39,84,.045)!important;cursor:grab}
+#settingsView .workflow-setting-card.dragging{opacity:.55;cursor:grabbing;transform:scale(.98)}
+#settingsView .workflow-setting-card.drag-over{outline:2px solid #8b5cf6!important;outline-offset:2px}
+#settingsView .workflow-card-icon{width:34px!important;height:34px!important;border-radius:11px!important;box-shadow:none!important}
+#settingsView .workflow-card-name{font-size:12px!important;margin-top:11px!important;min-height:30px}
+#settingsView .workflow-card-count,#settingsView .workflow-card-position{font-size:9px!important}
+#settingsView .workflow-remove-action{height:32px!important;background:#fbfbfd!important;color:#616a78!important;border:0!important;border-top:1px solid #ece8f3!important}
+#settingsView .workflow-order-savebar{border:1px solid #e9e4f1!important;border-radius:12px!important;background:#fff!important}
+#settingsView .workflow-order-savebar.dirty{background:#f7f2ff!important;border-color:#d8c9ff!important}
+
+/* Team access */
+#settingsView .cloud-settings .settings-collapse-btn{display:none!important}
+#settingsView .settings-access-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+#settingsView .access-tile{min-height:56px!important;padding:8px 10px!important;border-radius:12px!important;box-shadow:none!important}
+#settingsView .access-tile-icon{width:30px!important;height:30px!important;border-radius:10px!important}
+#settingsView .settings-access-actions{margin-top:12px!important;padding-top:12px!important;border-top:1px solid #eeeaf4!important;justify-content:flex-end!important}
+#settingsView .settings-access-actions #cloudManageUsers{order:-1;margin-right:auto}
+#settingsView .settings-access-actions .btn{height:34px!important;padding:0 11px!important}
+
+/* WIP */
+#settingsView .wip-editor{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+#settingsView .wip-row{min-height:46px!important;padding:7px 9px!important;border-radius:12px!important;background:#fff!important;box-shadow:none!important}
+#settingsView .wip-row .control{height:32px!important;border-radius:9px!important;text-align:center}
+
+/* Releases */
+#settingsView .release-create-box{padding:11px!important;border-radius:13px!important;background:#fbfffd!important}
+#settingsView .release-overview-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+#settingsView .release-overview-item.hidden{display:none!important}
+#settingsView .release-card-grid{grid-template-columns:1fr!important}
+#settingsView .release-lifecycle-card{border-radius:14px!important;background:#fff!important;padding:12px!important;box-shadow:none!important}
+#settingsView .release-card-metrics{margin:10px 0!important}
+
+/* Backup & recovery — summary left, history right */
+#settingsView .backup-settings{display:grid!important;grid-template-columns:300px minmax(0,1fr)!important;grid-template-areas:"backup-head backup-head" "backup-summary backup-list" "backup-status backup-list"!important;gap:12px 18px!important}
+#settingsView .backup-setting-head{grid-area:backup-head;margin-bottom:0!important;padding-bottom:12px;border-bottom:1px solid #ece8f3}
+#settingsView .backup-safety-note{grid-area:backup-summary;align-self:stretch;min-height:142px;margin:0!important;padding:18px!important;border:1px solid #e5def5!important;border-radius:16px!important;background:linear-gradient(145deg,#fbf8ff,#f7f2ff)!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;text-align:center!important;gap:10px!important}
+#settingsView .backup-safety-note>span{width:54px!important;height:54px!important;border-radius:18px!important;background:linear-gradient(145deg,#7c3aed,#5f2ee8)!important;font-size:0!important;box-shadow:0 10px 22px rgba(109,54,242,.2)}
+#settingsView .backup-safety-note>span:before{content:"";width:28px;height:28px;border:2px solid #fff;border-radius:50%;display:block;box-shadow:inset 0 0 0 5px transparent}
+#settingsView .backup-safety-note strong{font-size:14px!important;color:#2a233d}
+#settingsView .backup-safety-note small{font-size:10px!important;line-height:1.5!important;max-width:240px}
+#settingsView .backup-status-note{grid-area:backup-status;margin:0!important;text-align:center;font-size:9px!important;line-height:1.45;color:#7a8391}
+#settingsView #backupList{grid-area:backup-list;display:flex!important;flex-direction:column!important;gap:8px!important;max-height:320px!important;padding-right:2px}
+#settingsView .backup-card{grid-template-columns:38px minmax(0,1fr) auto!important;padding:10px 11px!important;border-radius:13px!important;background:#fff!important;box-shadow:none!important}
+#settingsView .backup-card-icon{background:#f0eaff!important;color:#6d36f2!important}
+#settingsView .backup-card-top strong{font-size:11px!important}
+#settingsView .backup-card-meta span{background:#f7f6fb!important}
+
+/* Admin divider and identity */
+#settingsView .settings-admin-divider{grid-area:admin-divider!important;margin:2px 0 0!important;display:flex!important;align-items:center!important;gap:13px!important;color:#6d36f2!important}
+#settingsView .settings-admin-divider span{height:1px!important;flex:1!important;background:linear-gradient(90deg,transparent,#d9cef8)!important}
+#settingsView .settings-admin-divider span:last-child{background:linear-gradient(90deg,#d9cef8,transparent)!important}
+#settingsView .settings-admin-divider strong{font-size:10px!important;letter-spacing:.12em!important;text-transform:uppercase!important}
+#settingsView .admin-identity-card{border:1px solid #ded2fb!important;background:linear-gradient(145deg,#fbf9ff,#f7f2ff)!important}
+#settingsView .admin-identity-head{padding:16px 18px 13px!important;background:transparent!important;border-bottom:1px solid #e5ddf6!important}
+#settingsView .admin-identity-kicker{color:#6d36f2!important}
+#settingsView .admin-identity-grid{padding:15px 18px 12px!important;grid-template-columns:1.45fr .65fr .8fr!important}
+#settingsView .admin-identity-grid .control{height:38px!important;border-radius:10px!important;background:#fff!important}
+#settingsView .admin-only-badge{background:#fff!important;border-color:#d8c9ff!important;color:#6d36f2!important}
+#settingsView .admin-identity-actions{padding:0 18px 16px!important}
+#settingsView .admin-identity-actions .btn{height:38px!important;border-radius:10px!important}
+
+/* Keep destructive functionality, but make it a compact danger zone at the very bottom */
+#settingsView .local-settings{padding:14px 16px!important;border-color:#f3d3da!important;background:#fffafb!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:12px!important}
+#settingsView .local-settings .setting-head{margin:0!important}
+#settingsView .local-settings .btn{height:36px!important;white-space:nowrap}
+
+#settingsView .btn.primary{background:linear-gradient(135deg,#7c3aed,#5f2ee8)!important;border-color:#6d36f2!important;box-shadow:0 6px 14px rgba(109,54,242,.17)!important}
+#settingsView .btn.primary:hover{filter:brightness(1.03)}
+
+@media(max-width:1280px){
+  #settingsView #statusEditor>.workflow-card-strip{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  #settingsView .settings-grid{grid-template-areas:"appearance appearance appearance appearance appearance appearance security security security security security security" "workflow workflow workflow workflow workflow workflow access access access access access access" "wip wip wip wip wip wip release release release release release release" "backup backup backup backup backup backup backup backup backup backup backup backup" "admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider admin-divider" "workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace workspace" "local local local local local local local local local local local local"!important}
+}
+@media(max-width:980px){
+  #settingsView .settings-grid{grid-template-columns:1fr 1fr!important;grid-template-areas:"appearance security" "workflow workflow" "access access" "wip release" "backup backup" "admin-divider admin-divider" "workspace workspace" "local local"!important}
+  #settingsView.is-non-admin .settings-grid{grid-template-areas:"appearance security" "workflow workflow" "access access" "wip release"!important}
+  #settingsView .backup-settings{grid-template-columns:1fr!important;grid-template-areas:"backup-head" "backup-summary" "backup-status" "backup-list"!important}
+  #settingsView .backup-safety-note{min-height:116px!important}
+  #settingsView .admin-identity-grid{grid-template-columns:1fr 1fr!important}
+  #settingsView .admin-identity-grid .workspace-config-field:first-child{grid-column:1/-1}
+}
+@media(max-width:680px){
+  #settingsView .settings-hero{padding:18px!important;align-items:flex-start!important}
+  #settingsView .settings-hero-actions{width:100%!important;margin-left:0!important;justify-content:flex-start!important}
+  #settingsView .settings-grid{grid-template-columns:1fr!important;grid-template-areas:"appearance" "security" "workflow" "access" "wip" "release" "backup" "admin-divider" "workspace" "local"!important}
+  #settingsView.is-non-admin .settings-grid{grid-template-areas:"appearance" "security" "workflow" "access" "wip" "release"!important}
+  #settingsView #statusEditor>.workflow-card-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #settingsView .settings-access-grid,#settingsView .wip-editor{grid-template-columns:1fr!important}
+  #settingsView .admin-identity-grid{grid-template-columns:1fr!important}
+  #settingsView .admin-identity-grid .workspace-config-field:first-child{grid-column:auto}
+  #settingsView .local-settings{grid-template-columns:1fr!important}
+}
