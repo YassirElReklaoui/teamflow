@@ -659,7 +659,7 @@
     document.addEventListener('pointerdown',semanticOutsideHandler,true);
     const refreshSemanticSelect=(select)=>refreshSemanticPicker(select);
     const statusSelect=$("#ticketStatus"),prioritySelect=$("#ticketPriority"),riskSelect=$("#ticketRisk");
-    let editorPreviousStatus=ticket.status;
+    let editorPreviousStatus=existing?.status || draft.status || presetStatus;
     if(existing&&statusSelect){statusSelect.addEventListener("change",()=>{const next=automaticProgressForStatusTransition(editorPreviousStatus,statusSelect.value,progressNumber.value);if(next!==normalizeProgress(progressNumber.value)){progressNumber.value=next;progressRange.value=next;paintProgress();}editorPreviousStatus=statusSelect.value;});}
     const assigneeSelect=$("#ticketAssignee"),assigneeAvatar=$("#ticketAssigneeAvatar");
     assigneeSelect?.addEventListener("change",()=>{const member=state.members.find(m=>m.name===assigneeSelect.value);const wrap=assigneeSelect.closest(".editor-assignee-control");if(assigneeAvatar)assigneeAvatar.textContent=initials(assigneeSelect.value||"Unassigned");if(wrap)wrap.style.setProperty("--editor-member-color",member?.color||memberColor(assigneeSelect.value||"Unassigned"));});
