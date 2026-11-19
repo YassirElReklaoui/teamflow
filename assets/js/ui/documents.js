@@ -705,7 +705,7 @@
         <div class="excel-viewer-head">
           <div class="excel-file-mark" aria-hidden="true">X</div>
           <div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${worksheets.length} sheet${worksheets.length===1?"":"s"} · ${totalRows.toLocaleString()} rows · ${totalCols.toLocaleString()} columns</span></div>
-          <span class="excel-local-badge">Local preview</span>
+          <span class="excel-local-badge">${doc.storageKey?"Shared workbook":"Local preview"}</span>
           <label class="excel-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search this sheet" data-excel-search /></label>
         </div>
         <div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div>
@@ -869,7 +869,7 @@
     let visibleDataRows=0;
     const body=rowOrder.map(rowNumber=>{if(filterRange&&rowNumber>filterRange.startRow&&rowNumber<=filterRange.endRow)visibleDataRows++;const height=visual?.rowHeights?.[rowNumber]?Math.max(20,Number(visual.rowHeights[rowNumber])*1.333):30,cells=[];for(const ci of visibleCols){if(mergeInfo.covered.has(`${rowNumber}:${ci}`))continue;const ref=`${excelColumnLabel(ci-1)}${rowNumber}`,cell=sheet?.[ref],text=excelCellText(sheet,rows,rowNumber,ci),formula=cell?.f?`=${cell.f}`:text,merge=mergeInfo.masters.get(`${rowNumber}:${ci}`);let style=ooxmlStyleCss(visual?.cellStyles?.[ref]);const spans=`${merge?.rowSpan>1?` rowspan="${merge.rowSpan}"`:""}${merge?.colSpan>1?` colspan="${merge.colSpan}"`:""}`;let freezeClass="",freezeStyle="";if(rowNumber<=Number(visual?.freezeRows||0)){freezeClass+=" excel-frozen-row";freezeStyle+=`position:sticky;top:${28+(rowNumber-1)*30}px;z-index:3;`;}if(ci<=Number(visual?.freezeCols||0)){freezeClass+=" excel-frozen-col";const left=48+colWidths.slice(0,ci-1).reduce((a,b)=>a+b,0);freezeStyle+=`position:sticky;left:${left}px;z-index:${rowNumber<=Number(visual?.freezeRows||0)?4:2};`;}const isFilter=filterRange&&rowNumber===filterRange.startRow&&ci>=filterRange.startCol&&ci<=filterRange.endCol,filterActive=!!stateForSheet.filters[ci]?.size||stateForSheet.sort?.col===ci;const contentHtml=isFilter?`<span class="excel-filter-head-label">${esc(text)}</span><button type="button" class="excel-filter-btn ${filterActive?"active":""}" data-excel-filter-col="${ci}" title="Filter / sort ${esc(text)}">${filterActive?"●":"▾"}</button>`:esc(text);cells.push(`<td tabindex="0" class="${freezeClass.trim()} ${isFilter?"excel-filter-head":""}" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" data-excel-row-number="${rowNumber}" data-excel-col-number="${ci}" title="${esc(text)}"${spans} style="${esc(`${style}${style&&freezeStyle?";":""}${freezeStyle}`)}">${contentHtml}</td>`);}return `<tr data-excel-row="${rowNumber}" style="height:${height}px"><th class="excel-row-head">${rowNumber}</th>${cells.join("")}</tr>`;}).join("");
     const filterSummary=filterRange?`<span>${visibleDataRows} / ${Math.max(0,Math.min(maxRows,filterRange.endRow)-filterRange.startRow)} filtered rows</span>`:"";
-    content.innerHTML=`<div class="excel-viewer-shell"><div class="excel-viewer-head"><div class="excel-file-mark">X</div><div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${sheetNames.length} sheet${sheetNames.length===1?"":"s"} · ${totalRows.toLocaleString()} rows · ${totalCols.toLocaleString()} columns</span></div><span class="excel-local-badge">Local preview</span><label class="excel-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search this sheet" data-excel-search /></label></div><div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div><div class="excel-grid-wrap"><table class="excel-grid">${header}<tbody>${body}</tbody></table></div><div class="excel-footer"><div class="excel-sheet-tabs">${sheetNames.map((n,i)=>{const tabColor=runtime.ooxml?.sheets?.[n]?.tabColor||"";return `<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" data-excel-sheet="${i}"${tabColor?` style="--excel-tab-color:${esc(tabColor)}"`:""}>${tabColor?'<i class="excel-tab-dot"></i>':""}<span>${esc(n)}</span></button>`;}).join("")}</div><div class="excel-sheet-stats">${filterSummary}<span>${rowOrder.length.toLocaleString()} visible rows</span><span>${visibleCols.length} / ${totalCols} columns</span>${totalRows>1000||totalCols>80?'<span class="excel-limit-note">Preview limited for performance</span>':""}</div></div><div class="excel-filter-menu" data-excel-filter-menu hidden></div></div>`;
+    content.innerHTML=`<div class="excel-viewer-shell"><div class="excel-viewer-head"><div class="excel-file-mark">X</div><div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${sheetNames.length} sheet${sheetNames.length===1?"":"s"} · ${totalRows.toLocaleString()} rows · ${totalCols.toLocaleString()} columns</span></div><span class="excel-local-badge">${doc.storageKey?"Shared workbook":"Local preview"}</span><label class="excel-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search this sheet" data-excel-search /></label></div><div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div><div class="excel-grid-wrap"><table class="excel-grid">${header}<tbody>${body}</tbody></table></div><div class="excel-footer"><div class="excel-sheet-tabs">${sheetNames.map((n,i)=>{const tabColor=runtime.ooxml?.sheets?.[n]?.tabColor||"";return `<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" data-excel-sheet="${i}"${tabColor?` style="--excel-tab-color:${esc(tabColor)}"`:""}>${tabColor?'<i class="excel-tab-dot"></i>':""}<span>${esc(n)}</span></button>`;}).join("")}</div><div class="excel-sheet-stats">${filterSummary}<span>${rowOrder.length.toLocaleString()} visible rows</span><span>${visibleCols.length} / ${totalCols} columns</span>${totalRows>1000||totalCols>80?'<span class="excel-limit-note">Preview limited for performance</span>':""}</div></div><div class="excel-filter-menu" data-excel-filter-menu hidden></div></div>`;
     bindExcelViewerEvents(doc,content,runtime,{sheetName,sheet,rows,visual,filterRange});
   }
 
@@ -896,11 +896,40 @@
     document.addEventListener("keydown",e=>{if(e.key==="Escape"){const menu=$("[data-excel-filter-menu]",content);if(menu)menu.hidden=true;}},{once:true});
   }
 
+  async function buildExcelRuntimeFromBuffer(doc,buffer){
+    const lowerName=String(doc?.name||"").toLowerCase();
+    if(!window.XLSX)throw new Error("Excel reader could not load. Check your connection and refresh TeamFlow.");
+    if(lowerName.endsWith(".xlsx")){
+      const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true,cellStyles:true});
+      let ooxml=null;
+      try{ooxml=await parseXlsxVisuals(buffer,workbook);}catch(styleErr){tfLogError("Excel OOXML style metadata skipped",styleErr,{name:doc?.name||""});}
+      return {workbook,ooxml,sheetIndex:0};
+    }
+    const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true});
+    return {workbook,sheetIndex:0};
+  }
+
   function renderExcelWorkbook(doc,content){
     const runtime=runtimeExcelBooks.get(doc.id);
-    if(!runtime){content.innerHTML=`<div class="doc-empty excel-missing"><strong>Excel preview is session-only.</strong><span>Choose the workbook again to preview it. Backend storage will be added after the viewer is approved.</span></div>`;return;}
-    if(runtime.workbook)return renderSheetJsWorkbook(doc,content,runtime);
-    content.innerHTML='<div class="doc-empty">This workbook could not be rendered.</div>';
+    if(runtime?.workbook){renderSheetJsWorkbook(doc,content,runtime);return;}
+    if(doc.storageKey){
+      content.innerHTML='<div class="doc-empty"><strong>Loading Excel workbook…</strong><span>Reading the shared workbook from TeamFlow storage.</span></div>';
+      (async()=>{
+        try{
+          const response=await window.teamFlowCloudFileRequest(`/documents/${encodeURIComponent(doc.id)}/content`);
+          const buffer=await response.arrayBuffer();
+          const loaded=await buildExcelRuntimeFromBuffer(doc,buffer);
+          runtimeExcelBooks.set(doc.id,loaded);
+          if(activeDocId!==doc.id)return;
+          const current=$("#docContent");if(current)renderSheetJsWorkbook(doc,current,loaded);
+        }catch(err){
+          tfLogError("Excel document load failed",err,{documentId:doc.id,name:doc.name});
+          if(activeDocId===doc.id&&$("#docContent"))$("#docContent").innerHTML=`<div class="doc-empty"><strong>Could not load this Excel workbook.</strong><span>${esc(err?.message||"")}</span></div>`;
+        }
+      })();
+      return;
+    }
+    content.innerHTML='<div class="doc-empty"><strong>Excel workbook is unavailable.</strong><span>Upload the workbook again to save it in TeamFlow.</span></div>';
   }
 
   window.previewExcelFile=async function(file,input){
@@ -908,23 +937,22 @@
       if(!file)return;
       const lowerName=String(file.name||"").toLowerCase();
       if(!lowerName.endsWith(".xlsx")&&!lowerName.endsWith(".xls")){toast("Please select an Excel .xlsx or .xls file");return;}
-      if(file.size>20*1024*1024){toast("File is too large for the preview. Maximum size is 20 MB");return;}
+      if(file.size>20*1024*1024){toast("File is too large. Maximum size is 20 MB");return;}
       const buffer=await file.arrayBuffer();
-      const id=`excel-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
-      if(lowerName.endsWith(".xlsx")){
-        if(!window.XLSX){toast("Excel reader could not load. Check your connection and refresh TeamFlow.");return;}
-        const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true,cellStyles:true});
-        let ooxml=null;
-        try{ooxml=await parseXlsxVisuals(buffer,workbook);}catch(styleErr){tfLogError("Excel OOXML style metadata skipped",styleErr,{name:file.name});}
-        runtimeExcelBooks.set(id,{workbook,ooxml,sheetIndex:0});
-      }else{
-        if(!window.XLSX){toast("Legacy Excel reader could not load. Check your connection and refresh TeamFlow.");return;}
-        const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true});
-        runtimeExcelBooks.set(id,{workbook,sheetIndex:0});
-      }
-      state.documents.push({id,name:file.name,kind:"excel-local",size:file.size,createdAt:new Date().toISOString()});
-      activeDocId=id;renderDocuments();switchView("documents");toast(`${file.name} opened in Excel preview`);
-    }catch(err){tfLogError("Excel preview failed",err,{name:file?.name,size:file?.size});toast(err?.message||"Could not open this Excel workbook");}
+      const localRuntime=await buildExcelRuntimeFromBuffer({name:file.name},buffer);
+      if(!window.teamFlowCloudFileRequest)throw new Error("TeamFlow file storage is not available");
+      toast(`Uploading ${file.name}…`);
+      const form=new FormData();form.append("file",file,file.name);form.append("name",file.name);
+      const response=await window.teamFlowCloudFileRequest("/documents/upload",{method:"POST",body:form});
+      const data=await response.json();
+      const saved=data.document;
+      if(!saved?.id)throw new Error("The workbook was uploaded but no document ID was returned");
+      runtimeExcelBooks.set(saved.id,localRuntime);
+      activeDocId=saved.id;
+      await loadRemoteWorkspace({quiet:true});
+      activeDocId=saved.id;
+      renderDocuments();switchView("documents");toast(`${file.name} uploaded and saved`);
+    }catch(err){tfLogError("Excel upload failed",err,{name:file?.name,size:file?.size});toast(err?.message||"Could not upload this Excel workbook");}
     finally{if(input)input.value="";}
   };
 
@@ -941,7 +969,7 @@
 
     list.innerHTML=state.documents.map(d=>`
       <button class="doc-item ${d.id===activeDocId?"active":""}" data-doc-id="${esc(d.id)}" type="button">
-        <span class="${d.kind==="excel-local"?"doc-kind-excel":""}">${d.kind==="html"?"⌘":(d.kind==="pdf"||d.kind==="pdf-local")?"PDF":d.kind==="excel-local"?"XLS":d.kind==="sharepoint"?"W":"＋"}</span>
+        <span class="${(d.kind==="excel"||d.kind==="excel-local")?"doc-kind-excel":""}">${d.kind==="html"?"⌘":(d.kind==="pdf"||d.kind==="pdf-local")?"PDF":(d.kind==="excel"||d.kind==="excel-local")?"XLS":d.kind==="sharepoint"?"W":"＋"}</span>
         <span class="doc-name">${esc(d.name)}</span>
       </button>
     `).join("");
@@ -1022,7 +1050,7 @@
       content.innerHTML=url
         ? `<iframe src="${esc(url)}" title="${esc(doc.name)}"></iframe>`
         : `<div class="doc-empty">This PDF was loaded only for the current browser session. Re-upload the PDF to preview it again.</div>`;
-    }else if(doc.kind==="excel-local"){
+    }else if(doc.kind==="excel"||doc.kind==="excel-local"){
       renderExcelWorkbook(doc,content);
     }else if(doc.kind==="sharepoint"){
       content.innerHTML=`<iframe src="${esc(doc.url)}" title="${esc(doc.name)}"></iframe>`;
@@ -1039,4 +1067,3 @@
       renderRichBlankEditor(doc,content);
     }
   }
-
