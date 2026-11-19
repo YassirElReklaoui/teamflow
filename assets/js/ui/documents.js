@@ -743,11 +743,39 @@
     return Number.isFinite(indexed)?(palette[indexed]||""):"";
   }
 
+  function excelColorRgb(hex){
+    const m=String(hex||"").trim().match(/^#([0-9a-f]{6})$/i);
+    if(!m)return null;
+    return [parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4,6),16)];
+  }
+
+  function excelColorLuminance(hex){
+    const rgb=excelColorRgb(hex);if(!rgb)return null;
+    const c=rgb.map(v=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);});
+    return .2126*c[0]+.7152*c[1]+.0722*c[2];
+  }
+
+  function excelContrastRatio(a,b){
+    const l1=excelColorLuminance(a),l2=excelColorLuminance(b);if(l1==null||l2==null)return 21;
+    const hi=Math.max(l1,l2),lo=Math.min(l1,l2);return (hi+.05)/(lo+.05);
+  }
+
+  function excelSafeTextColor(style){
+    const dark=document.documentElement.getAttribute("data-theme")==="dark";
+    const appBg=dark?"#111827":"#FFFFFF";
+    const bg=style?.fill||appBg;
+    const requested=style?.color||"";
+    if(!requested)return "";
+    if(excelContrastRatio(requested,bg)>=3)return requested;
+    return (excelColorLuminance(bg)??(dark?0:1))>.45?"#111827":"#F8FAFC";
+  }
+
   function ooxmlStyleCss(style){
     if(!style)return "";
     const css=[];
     if(style.fill)css.push(`background:${style.fill}`);
-    if(style.color)css.push(`color:${style.color}`);
+    const safeColor=excelSafeTextColor(style);
+    if(safeColor)css.push(`color:${safeColor}`);
     if(style.bold)css.push("font-weight:700");
     if(style.italic)css.push("font-style:italic");
     if(style.underline)css.push("text-decoration:underline");

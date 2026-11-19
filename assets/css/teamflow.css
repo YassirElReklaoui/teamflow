@@ -2671,3 +2671,33 @@ html[data-theme="dark"] .excel-local-badge{color:#75dda2}
 .excel-grid tbody tr:nth-child(even) td:not([style*="background"]){background:color-mix(in srgb,var(--panel-2) 48%,var(--panel))}
 .excel-grid td.is-selected{box-shadow:inset 0 0 0 2px #16834a;outline:0!important}
 @media(max-width:700px){.excel-filter-menu{width:min(292px,calc(100vw - 16px));left:8px!important}}
+
+/* ===== Excel viewer: readable workbook colors + dark mode ===== */
+.excel-viewer-shell,
+.excel-viewer-head,
+.excel-formula-bar,
+.excel-grid-wrap,
+.excel-footer,
+.excel-filter-menu{color:var(--text)}
+.excel-grid td:not([style*="background"]){color:var(--text)!important}
+.excel-grid td:not([style*="background"]):not([style*="color"]){color:var(--text)!important}
+html[data-theme="dark"] .excel-viewer-shell{background:var(--panel);border-color:var(--border)}
+html[data-theme="dark"] .excel-viewer-head,
+html[data-theme="dark"] .excel-formula-bar,
+html[data-theme="dark"] .excel-footer{background:var(--panel-2);border-color:var(--border)}
+html[data-theme="dark"] .excel-grid-wrap{background:var(--panel)}
+html[data-theme="dark"] .excel-grid th,
+html[data-theme="dark"] .excel-grid td:not([style*="background"]){background:var(--panel);border-color:var(--border);color:var(--text)!important}
+html[data-theme="dark"] .excel-grid tbody tr:nth-child(even) td:not([style*="background"]){background:color-mix(in srgb,var(--panel-2) 70%,var(--panel))}
+html[data-theme="dark"] .excel-grid thead th,
+html[data-theme="dark"] .excel-grid .excel-row-head,
+html[data-theme="dark"] .excel-grid .excel-corner{background:var(--panel-3);color:var(--muted);border-color:var(--border)}
+html[data-theme="dark"] .excel-search,
+html[data-theme="dark"] .excel-filter-search,
+html[data-theme="dark"] .excel-filter-sort button,
+html[data-theme="dark"] .excel-filter-actions button{background:var(--panel);color:var(--text);border-color:var(--border)}
+html[data-theme="dark"] .excel-filter-menu-head,
+html[data-theme="dark"] .excel-filter-menu-foot{background:var(--panel-2)}
+html[data-theme="dark"] .excel-sheet-tab:hover{background:var(--panel-3)}
+html[data-theme="dark"] .excel-sheet-tab.active{background:color-mix(in srgb,#16834a 14%,var(--panel));color:#75dda2}
+html[data-theme="dark"] .excel-grid td.is-selected{box-shadow:inset 0 0 0 2px #22c55e!important}
