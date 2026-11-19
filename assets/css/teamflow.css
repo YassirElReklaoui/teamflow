@@ -688,7 +688,7 @@
     .ticket::before{width:4px}.ticket h3{font-size:calc(12.5px + var(--app-font-delta, 0px));margin:6px 0 8px}.ticket-top{font-size:calc(12px + var(--app-font-delta, 0px))}.tag{font-size:calc(12px + var(--app-font-delta, 0px));padding:3px 6px}.ticket-footer{margin-top:8px;padding-top:7px}.assignee-chip{padding:4px 6px 4px 4px;border-radius:8px}.assignee-name{font-size:calc(12px + var(--app-font-delta, 0px))}.ticket-stats{font-size:calc(12px + var(--app-font-delta, 0px))}.stat-chip{min-height:20px}.progress-block{margin-top:8px}.progress-track{height:5px}
 
     /* Add-content cards inspired by the supplied workspace mockup */
-    .doc-actions{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:10px;margin:14px 0}
+    .doc-actions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:14px 0}
     .doc-actions>.btn{position:relative;min-height:118px;padding:15px 10px 12px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;text-align:center;background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel-2) 70%,var(--panel)));font-size:calc(12px + var(--app-font-delta, 0px));color:var(--text);border:1px solid var(--border);box-shadow:0 5px 16px rgba(31,39,70,.04)}
     .doc-actions>.btn::before{height:39px;display:grid;place-items:center;margin-bottom:2px;font-size:calc(26px + var(--app-font-delta, 0px));font-weight:900;line-height:1}
     .doc-actions>.btn::after{display:block;max-width:135px;color:var(--muted);font-size:calc(12px + var(--app-font-delta, 0px));font-weight:600;line-height:1.35;white-space:normal}
@@ -696,11 +696,18 @@
     .doc-actions>label[for="htmlUpload"]::after{content:"Upload & preview an interactive HTML page"}
     .doc-actions>label[for="pdfUpload"]::before{content:"PDF";color:#ef4444;font-size:calc(14px + var(--app-font-delta, 0px));background:#fee2e2;border-radius:8px;padding:7px 6px;height:auto}
     .doc-actions>label[for="pdfUpload"]::after{content:"Preview PDF content directly"}
+    .doc-actions>label[for="excelUpload"]::before{content:"X";color:#fff;background:#16834a;border-radius:9px;width:36px;height:36px;font-size:calc(20px + var(--app-font-delta, 0px));font-family:Arial,sans-serif}
+    .doc-actions>label[for="excelUpload"]::after{content:"Preview Excel workbooks directly"}
     .doc-actions>#addWordLink::before{content:"W";color:#fff;background:#1976d2;border-radius:9px;width:36px;height:36px;font-size:calc(20px + var(--app-font-delta, 0px))}
     .doc-actions>#addWordLink::after{content:"Open a Word file from SharePoint / Online"}
     .doc-actions>#addBlankPage::before{content:"□";color:#475569;font-size:calc(31px + var(--app-font-delta, 0px))}
     .doc-actions>#addBlankPage::after{content:"Create a rich custom workspace"}
     .doc-actions>.btn:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 28%,var(--border));box-shadow:0 10px 24px rgba(31,39,70,.075)}
+
+    @media(max-width:1100px){.doc-actions{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:720px){.doc-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:480px){.doc-actions{grid-template-columns:1fr}}
+
     .doc-layout{gap:12px}.doc-list,.doc-viewer{border-radius:14px}.doc-list{background:var(--panel-2)}.doc-viewer{background:var(--panel-2);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--border) 40%,transparent)}
     .doc-item{border-radius:9px;font-size:calc(12px + var(--app-font-delta, 0px))}.doc-item.active{box-shadow:0 4px 11px rgba(31,39,70,.05)}
 
