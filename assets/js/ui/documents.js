@@ -718,16 +718,85 @@
     bindExcelViewerEvents(doc,content,runtime);
   }
 
+  function ooxmlRgb(node){
+    const rgb=node?.getAttribute?.("rgb");
+    if(rgb){const v=rgb.replace(/^FF/i,"");return /^[0-9A-Fa-f]{6}$/.test(v)?`#${v}`:"";}
+    const indexed=Number(node?.getAttribute?.("indexed"));
+    const palette=["#000000","#FFFFFF","#FF0000","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF","#000000","#FFFFFF","#FF0000","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF","#800000","#008000","#000080","#808000","#800080","#008080","#C0C0C0","#808080"];
+    return Number.isFinite(indexed)?(palette[indexed]||""):"";
+  }
+
+  function ooxmlStyleCss(style){
+    if(!style)return "";
+    const css=[];
+    if(style.fill)css.push(`background:${style.fill}`);
+    if(style.color)css.push(`color:${style.color}`);
+    if(style.bold)css.push("font-weight:700");
+    if(style.italic)css.push("font-style:italic");
+    if(style.underline)css.push("text-decoration:underline");
+    if(style.fontSize)css.push(`font-size:${Math.max(8,Math.min(24,Number(style.fontSize)))}px`);
+    if(style.fontName)css.push(`font-family:${JSON.stringify(style.fontName)},Arial,sans-serif`);
+    if(style.horizontal&&["left","center","right","justify"].includes(style.horizontal))css.push(`text-align:${style.horizontal}`);
+    if(style.vertical&&["top","center","bottom"].includes(style.vertical))css.push(`vertical-align:${style.vertical==="center"?"middle":style.vertical}`);
+    if(style.wrapText)css.push("white-space:normal");
+    for(const side of ["top","right","bottom","left"]){const b=style.border?.[side];if(!b?.style)continue;const width=/medium|thick/i.test(b.style)?2:1;const line=/dash/i.test(b.style)?"dashed":/dot/i.test(b.style)?"dotted":"solid";css.push(`border-${side}:${width}px ${line} ${b.color||"#cbd5e1"}`);}
+    return css.join(";");
+  }
+
+  async function parseXlsxVisuals(buffer,workbook){
+    if(!window.JSZip)return null;
+    const zip=await window.JSZip.loadAsync(buffer);
+    const parser=new DOMParser();
+    const xml=async name=>{const f=zip.file(name);return f?parser.parseFromString(await f.async("string"),"application/xml"):null;};
+    const stylesDoc=await xml("xl/styles.xml");
+    if(!stylesDoc)return null;
+    const fonts=[...stylesDoc.getElementsByTagName("font")].map(n=>({bold:!!n.getElementsByTagName("b")[0],italic:!!n.getElementsByTagName("i")[0],underline:!!n.getElementsByTagName("u")[0],color:ooxmlRgb(n.getElementsByTagName("color")[0]),fontSize:Number(n.getElementsByTagName("sz")[0]?.getAttribute("val")||0),fontName:n.getElementsByTagName("name")[0]?.getAttribute("val")||""}));
+    const fills=[...stylesDoc.getElementsByTagName("fill")].map(n=>{const p=n.getElementsByTagName("patternFill")[0];if(!p)return "";const fg=ooxmlRgb(p.getElementsByTagName("fgColor")[0]);const bg=ooxmlRgb(p.getElementsByTagName("bgColor")[0]);return fg||bg||"";});
+    const borderNodes=[...stylesDoc.getElementsByTagName("border")];
+    const borders=borderNodes.map(n=>{const out={};for(const side of ["left","right","top","bottom"]){const el=n.getElementsByTagName(side)[0];if(el?.getAttribute("style"))out[side]={style:el.getAttribute("style"),color:ooxmlRgb(el.getElementsByTagName("color")[0])};}return out;});
+    const xfsParent=stylesDoc.getElementsByTagName("cellXfs")[0];
+    const xfs=xfsParent?[...xfsParent.children].filter(n=>n.localName==="xf").map(x=>{const font=fonts[Number(x.getAttribute("fontId")||0)]||{},fill=fills[Number(x.getAttribute("fillId")||0)]||"",border=borders[Number(x.getAttribute("borderId")||0)]||{};const a=x.getElementsByTagName("alignment")[0];return {...font,fill,border,horizontal:a?.getAttribute("horizontal")||"",vertical:a?.getAttribute("vertical")||"",wrapText:a?.getAttribute("wrapText")==="1"};}):[];
+
+    const wbDoc=await xml("xl/workbook.xml"),relsDoc=await xml("xl/_rels/workbook.xml.rels");
+    const relMap=new Map();
+    if(relsDoc)for(const r of [...relsDoc.getElementsByTagName("Relationship")])relMap.set(r.getAttribute("Id"),r.getAttribute("Target"));
+    const sheetPathByName=new Map();
+    if(wbDoc)for(const s of [...wbDoc.getElementsByTagName("sheet")]){const name=s.getAttribute("name")||"";const rid=s.getAttribute("r:id")||s.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");let target=relMap.get(rid)||"";target=target.replace(/^\//,"");if(target&&!target.startsWith("xl/"))target=`xl/${target.replace(/^\.\//,"")}`;if(name&&target)sheetPathByName.set(name,target);}
+
+    const sheets={};
+    for(const name of workbook.SheetNames||[]){
+      let path=sheetPathByName.get(name);
+      if(!path){const idx=(workbook.SheetNames||[]).indexOf(name)+1;path=`xl/worksheets/sheet${idx}.xml`;}
+      const doc=await xml(path);if(!doc)continue;
+      const cellStyles={},rowHeights={},colWidths={},merges=[];
+      for(const c of [...doc.getElementsByTagName("c")]){const ref=c.getAttribute("r"),sid=Number(c.getAttribute("s")||0);if(ref&&xfs[sid])cellStyles[ref]=xfs[sid];}
+      for(const row of [...doc.getElementsByTagName("row")]){const r=Number(row.getAttribute("r")||0),ht=Number(row.getAttribute("ht")||0);if(r&&ht)rowHeights[r]=ht;}
+      for(const col of [...doc.getElementsByTagName("col")]){const min=Number(col.getAttribute("min")||0),max=Number(col.getAttribute("max")||min),width=Number(col.getAttribute("width")||0);if(width)for(let c=min;c<=max;c++)colWidths[c]=width;}
+      for(const m of [...doc.getElementsByTagName("mergeCell")]){const ref=m.getAttribute("ref");if(ref)merges.push(ref);}
+      sheets[name]={cellStyles,rowHeights,colWidths,merges};
+    }
+    return {sheets};
+  }
+
+  function mergeInfoFromRefs(refs){
+    const masters=new Map(),covered=new Set();
+    for(const ref of refs||[]){const [a,b]=String(ref).split(":");if(!a||!b)continue;const da=window.XLSX.utils.decode_cell(a),db=window.XLSX.utils.decode_cell(b);masters.set(`${da.r+1}:${da.c+1}`,{rowSpan:db.r-da.r+1,colSpan:db.c-da.c+1});for(let r=da.r;r<=db.r;r++)for(let c=da.c;c<=db.c;c++)if(r!==da.r||c!==da.c)covered.add(`${r+1}:${c+1}`);}
+    return {masters,covered};
+  }
+
   function renderSheetJsWorkbook(doc,content,runtime){
     const workbook=runtime.workbook;
     const sheetNames=Array.isArray(workbook?.SheetNames)?workbook.SheetNames:[];
     if(!sheetNames.length){content.innerHTML='<div class="doc-empty">This workbook does not contain any worksheets.</div>';return;}
     const sheetIndex=Math.max(0,Math.min(Number(runtime.sheetIndex||0),sheetNames.length-1));runtime.sheetIndex=sheetIndex;
-    const sheet=workbook.Sheets[sheetNames[sheetIndex]],rows=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false,blankrows:true});
-    const totalRows=Math.max(1,rows.length),totalCols=Math.max(1,...rows.map(r=>Array.isArray(r)?r.length:0)),maxRows=Math.min(totalRows,1000),maxCols=Math.min(totalCols,80);
-    const header=`<thead><tr><th class="excel-corner"></th>${Array.from({length:maxCols},(_,i)=>`<th class="excel-col-head">${excelColumnLabel(i)}</th>`).join("")}</tr></thead>`;
-    const body=rows.slice(0,maxRows).map((row,rowIndex)=>`<tr data-excel-row="${rowIndex}"><th class="excel-row-head">${rowIndex+1}</th>${Array.from({length:maxCols},(_,colIndex)=>{const ref=`${excelColumnLabel(colIndex)}${rowIndex+1}`,cell=sheet?.[ref],text=cell?.w!==undefined?String(cell.w):String(row?.[colIndex]??""),formula=cell?.f?`=${cell.f}`:text;return `<td tabindex="0" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" title="${esc(text)}">${esc(text)}</td>`;}).join("")}</tr>`).join("");
-    content.innerHTML=`<div class="excel-viewer-shell"><div class="excel-viewer-head"><div class="excel-file-mark">X</div><div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${sheetNames.length} sheets · ${totalRows} rows · ${totalCols} columns</span></div><span class="excel-local-badge">Legacy .xls preview</span><label class="excel-search"><input type="search" placeholder="Search this sheet" data-excel-search /></label></div><div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div><div class="excel-grid-wrap"><table class="excel-grid">${header}<tbody>${body}</tbody></table></div><div class="excel-footer"><div class="excel-sheet-tabs">${sheetNames.map((n,i)=>`<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" data-excel-sheet="${i}">${esc(n)}</button>`).join("")}</div></div></div>`;
+    const sheetName=sheetNames[sheetIndex],sheet=workbook.Sheets[sheetName],rows=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false,blankrows:true});
+    const visual=runtime.ooxml?.sheets?.[sheetName]||null;
+    const range=sheet?.["!ref"]?window.XLSX.utils.decode_range(sheet["!ref"]):null;
+    const totalRows=Math.max(1,range?range.e.r+1:rows.length),totalCols=Math.max(1,range?range.e.c+1:Math.max(0,...rows.map(r=>Array.isArray(r)?r.length:0))),maxRows=Math.min(totalRows,1000),maxCols=Math.min(totalCols,80);
+    const mergeInfo=mergeInfoFromRefs(visual?.merges||sheet?.["!merges"]?.map(m=>window.XLSX.utils.encode_range(m))||[]);
+    const header=`<thead><tr><th class="excel-corner"></th>${Array.from({length:maxCols},(_,i)=>{const width=Math.max(54,Math.min(320,Math.round(Number(visual?.colWidths?.[i+1]||12)*7.2)));return `<th class="excel-col-head" style="width:${width}px;min-width:${width}px">${excelColumnLabel(i)}</th>`;}).join("")}</tr></thead>`;
+    const body=Array.from({length:maxRows},(_,rowIndex)=>{const rowNumber=rowIndex+1,row=rows[rowIndex]||[],height=visual?.rowHeights?.[rowNumber]?` style="height:${Math.max(20,Number(visual.rowHeights[rowNumber])*1.333)}px"`:"";const cells=[];for(let ci=1;ci<=maxCols;ci++){if(mergeInfo.covered.has(`${rowNumber}:${ci}`))continue;const ref=`${excelColumnLabel(ci-1)}${rowNumber}`,cell=sheet?.[ref],text=cell?.w!==undefined?String(cell.w):String(row?.[ci-1]??""),formula=cell?.f?`=${cell.f}`:text,style=ooxmlStyleCss(visual?.cellStyles?.[ref]),merge=mergeInfo.masters.get(`${rowNumber}:${ci}`),spans=`${merge?.rowSpan>1?` rowspan="${merge.rowSpan}"`:""}${merge?.colSpan>1?` colspan="${merge.colSpan}"`:""}`;cells.push(`<td tabindex="0" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" title="${esc(text)}"${spans}${style?` style="${esc(style)}"`:""}>${esc(text)}</td>`);}return `<tr data-excel-row="${rowIndex}"${height}><th class="excel-row-head">${rowNumber}</th>${cells.join("")}</tr>`;}).join("");
+    content.innerHTML=`<div class="excel-viewer-shell"><div class="excel-viewer-head"><div class="excel-file-mark">X</div><div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${sheetNames.length} sheet${sheetNames.length===1?"":"s"} · ${totalRows.toLocaleString()} rows · ${totalCols.toLocaleString()} columns</span></div><span class="excel-local-badge">Local preview</span><label class="excel-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search this sheet" data-excel-search /></label></div><div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div><div class="excel-grid-wrap"><table class="excel-grid">${header}<tbody>${body}</tbody></table></div><div class="excel-footer"><div class="excel-sheet-tabs">${sheetNames.map((n,i)=>`<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" data-excel-sheet="${i}">${esc(n)}</button>`).join("")}</div><div class="excel-sheet-stats"><span>${maxRows.toLocaleString()} / ${totalRows.toLocaleString()} rows</span><span>${maxCols} / ${totalCols} columns</span>${totalRows>1000||totalCols>80?'<span class="excel-limit-note">Preview limited for performance</span>':''}</div></div></div>`;
     bindExcelViewerEvents(doc,content,runtime);
   }
 
@@ -741,7 +810,6 @@
   function renderExcelWorkbook(doc,content){
     const runtime=runtimeExcelBooks.get(doc.id);
     if(!runtime){content.innerHTML=`<div class="doc-empty excel-missing"><strong>Excel preview is session-only.</strong><span>Choose the workbook again to preview it. Backend storage will be added after the viewer is approved.</span></div>`;return;}
-    if(runtime.excelWorkbook)return renderExcelJsWorkbook(doc,content,runtime);
     if(runtime.workbook)return renderSheetJsWorkbook(doc,content,runtime);
     content.innerHTML='<div class="doc-empty">This workbook could not be rendered.</div>';
   }
@@ -755,40 +823,11 @@
       const buffer=await file.arrayBuffer();
       const id=`excel-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
       if(lowerName.endsWith(".xlsx")){
-        if(!window.ExcelJS?.Workbook){toast("Excel style reader could not load. Check your connection and refresh TeamFlow.");return;}
-        let workbook=new window.ExcelJS.Workbook();
-        try{
-          await workbook.xlsx.load(buffer);
-        }catch(loadErr){
-          const msg=String(loadErr?.message||loadErr||"");
-          if(!/anchors|drawing/i.test(msg))throw loadErr;
-          tfLogError("ExcelJS drawing metadata skipped",loadErr,{name:file.name});
-          if(!window.JSZip)throw loadErr;
-          const zip=await window.JSZip.loadAsync(buffer);
-          const relFiles=Object.keys(zip.files).filter(n=>/^xl\/worksheets\/_rels\/sheet\d+\.xml\.rels$/i.test(n));
-          for(const relName of relFiles){
-            const relFile=zip.file(relName);
-            if(!relFile)continue;
-            let xml=await relFile.async("string");
-            xml=xml.replace(/<Relationship\b[^>]*Type=["'][^"']*\/(?:drawing|vmlDrawing)["'][^>]*\/?>(?:<\/Relationship>)?/gi,"");
-            zip.file(relName,xml);
-          }
-          for(const name of Object.keys(zip.files)){
-            if(/^xl\/drawings\//i.test(name)||/^xl\/charts\//i.test(name))zip.remove(name);
-          }
-          const sheetFiles=Object.keys(zip.files).filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/i.test(n));
-          for(const sheetName of sheetFiles){
-            const sheetFile=zip.file(sheetName);
-            if(!sheetFile)continue;
-            let xml=await sheetFile.async("string");
-            xml=xml.replace(/<drawing\b[^>]*\/?>(?:<\/drawing>)?/gi,"").replace(/<legacyDrawing\b[^>]*\/?>(?:<\/legacyDrawing>)?/gi,"");
-            zip.file(sheetName,xml);
-          }
-          const cleanBuffer=await zip.generateAsync({type:"arraybuffer",compression:"DEFLATE"});
-          workbook=new window.ExcelJS.Workbook();
-          await workbook.xlsx.load(cleanBuffer);
-        }
-        runtimeExcelBooks.set(id,{excelWorkbook:workbook,sheetIndex:0});
+        if(!window.XLSX){toast("Excel reader could not load. Check your connection and refresh TeamFlow.");return;}
+        const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true,cellStyles:true});
+        let ooxml=null;
+        try{ooxml=await parseXlsxVisuals(buffer,workbook);}catch(styleErr){tfLogError("Excel OOXML style metadata skipped",styleErr,{name:file.name});}
+        runtimeExcelBooks.set(id,{workbook,ooxml,sheetIndex:0});
       }else{
         if(!window.XLSX){toast("Legacy Excel reader could not load. Check your connection and refresh TeamFlow.");return;}
         const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true});
