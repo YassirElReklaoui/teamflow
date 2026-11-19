@@ -235,7 +235,7 @@
               <div class="editor-key-row"><label>${editorIcon('flag')}<span>Priority</span></label>${semanticPickerHtml({id:"ticketPriority",kind:"priority",value:ticket.priority,values:["High","Medium","Low"]})}</div>
               <div class="editor-key-row"><label>${editorIcon('area')}<span>Area / ARCH / BE / FE</span></label><select id="ticketArea">${["ARCH","BE","FE","QA"].map(v=>`<option ${v===ticket.area?"selected":""}>${v}</option>`).join("")}</select></div>
               <div class="editor-key-row"><label>${editorIcon('alert')}<span>Risk / Delivery flag</span></label>${semanticPickerHtml({id:"ticketRisk",kind:"risk",value:(ticket.risk||"None"),values:["None","At Risk","Blocked"]})}</div>
-              <div class="editor-key-row editor-key-row-progress"><label>${editorIcon('chart')}<span>Progress</span></label><div class="progress-editor editor-side-progress"><input id="ticketProgressRange" type="range" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" /><div class="progress-number"><input id="ticketProgress" type="number" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" /><span>%</span></div></div></div>
+              <div class="editor-key-row editor-key-row-progress"><label>${editorIcon('chart')}<span>Progress</span></label><div class="progress-editor editor-side-progress"><input id="ticketProgressRange" type="range" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" style="--progress-pct:${normalizeProgress(ticket.progress)}%" /><div class="progress-number"><input id="ticketProgress" type="number" min="0" max="100" step="1" value="${normalizeProgress(ticket.progress)}" /><span>%</span></div></div></div>
               <div class="editor-key-row"><label>${editorIcon('calendar')}<span>Start date</span></label><input id="ticketStart" type="date" value="${esc(ticket.start||"")}" /></div>
               <div class="editor-key-row"><label>${editorIcon('calendar')}<span>Expected end date</span></label><input id="ticketEnd" type="date" value="${esc(ticket.end||"")}" /></div>
             </div>
@@ -640,12 +640,14 @@
     };
     const progressRange=$("#ticketProgressRange");
     const progressNumber=$("#ticketProgress");
+    const paintProgress=()=>{const value=normalizeProgress(progressRange.value);progressRange.style.setProperty("--progress-pct",`${value}%`);};
     const syncProgress=(source,target)=>{
       const value=normalizeProgress(source.value);
-      source.value=value;target.value=value;
+      source.value=value;target.value=value;paintProgress();
     };
     progressRange.addEventListener("input",()=>syncProgress(progressRange,progressNumber));
     progressNumber.addEventListener("input",()=>syncProgress(progressNumber,progressRange));
+    paintProgress();
 
     const editorModalRoot=$(".ticket-editor-modal");
     let activeSemanticPicker=null;
@@ -657,6 +659,8 @@
     document.addEventListener('pointerdown',semanticOutsideHandler,true);
     const refreshSemanticSelect=(select)=>refreshSemanticPicker(select);
     const statusSelect=$("#ticketStatus"),prioritySelect=$("#ticketPriority"),riskSelect=$("#ticketRisk");
+    let editorPreviousStatus=ticket.status;
+    if(existing&&statusSelect){statusSelect.addEventListener("change",()=>{const next=automaticProgressForStatusTransition(editorPreviousStatus,statusSelect.value,progressNumber.value);if(next!==normalizeProgress(progressNumber.value)){progressNumber.value=next;progressRange.value=next;paintProgress();}editorPreviousStatus=statusSelect.value;});}
     const assigneeSelect=$("#ticketAssignee"),assigneeAvatar=$("#ticketAssigneeAvatar");
     assigneeSelect?.addEventListener("change",()=>{const member=state.members.find(m=>m.name===assigneeSelect.value);const wrap=assigneeSelect.closest(".editor-assignee-control");if(assigneeAvatar)assigneeAvatar.textContent=initials(assigneeSelect.value||"Unassigned");if(wrap)wrap.style.setProperty("--editor-member-color",member?.color||memberColor(assigneeSelect.value||"Unassigned"));});
     $("#assignTicketToMe")?.addEventListener("click",()=>{const self=linkedMemberForCurrentUser();if(!self||!assigneeSelect)return;assigneeSelect.value=self.name;assigneeSelect.dispatchEvent(new Event("change",{bubbles:true}));toast(`Assigned to ${self.name}`);});

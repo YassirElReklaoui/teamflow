@@ -285,6 +285,14 @@
     return Math.max(0,Math.min(100,Math.round(n)));
   }
 
+  function automaticProgressForStatusTransition(fromStatus,toStatus,currentProgress){
+    const from=String(fromStatus||"").trim().toLowerCase();
+    const to=String(toStatus||"").trim().toLowerCase();
+    if(from==="to be started" && to==="ongoing") return 5;
+    if(from==="ongoing" && to==="done") return 100;
+    return normalizeProgress(currentProgress);
+  }
+
   function normalizeWorkflowOrder(){
     // Identity cleanup only. NEVER writes or reorders workflow positions.
     if(!Array.isArray(state.statuses)||!state.statuses.length)state.statuses=clone(DEFAULT_STATUSES);
