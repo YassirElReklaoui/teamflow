@@ -718,10 +718,27 @@
     bindExcelViewerEvents(doc,content,runtime);
   }
 
-  function ooxmlRgb(node){
-    const rgb=node?.getAttribute?.("rgb");
-    if(rgb){const v=rgb.replace(/^FF/i,"");return /^[0-9A-Fa-f]{6}$/.test(v)?`#${v}`:"";}
-    const indexed=Number(node?.getAttribute?.("indexed"));
+  function excelHexColor(raw){
+    let value=String(raw||"").replace(/^#/g,"").trim();
+    if(/^[0-9A-Fa-f]{8}$/.test(value)) value=value.slice(2);
+    return /^[0-9A-Fa-f]{6}$/.test(value)?`#${value.toUpperCase()}`:"";
+  }
+
+  function excelTintColor(hex,tint){
+    if(!hex||!Number.isFinite(Number(tint))||Number(tint)===0)return hex;
+    const t=Math.max(-1,Math.min(1,Number(tint))),rgb=hex.replace("#","").match(/.{2}/g)?.map(v=>parseInt(v,16));
+    if(!rgb)return hex;
+    const out=rgb.map(v=>Math.round(t<0?v*(1+t):v+(255-v)*t));
+    return `#${out.map(v=>v.toString(16).padStart(2,"0")).join("").toUpperCase()}`;
+  }
+
+  function ooxmlRgb(node,themeColors=[]){
+    if(!node)return "";
+    const direct=excelHexColor(node.getAttribute?.("rgb"));
+    if(direct)return excelTintColor(direct,Number(node.getAttribute?.("tint")||0));
+    const theme=Number(node.getAttribute?.("theme"));
+    if(Number.isFinite(theme)&&themeColors[theme])return excelTintColor(themeColors[theme],Number(node.getAttribute?.("tint")||0));
+    const indexed=Number(node.getAttribute?.("indexed"));
     const palette=["#000000","#FFFFFF","#FF0000","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF","#000000","#FFFFFF","#FF0000","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF","#800000","#008000","#000080","#808000","#800080","#008080","#C0C0C0","#808080"];
     return Number.isFinite(indexed)?(palette[indexed]||""):"";
   }
@@ -734,46 +751,60 @@
     if(style.bold)css.push("font-weight:700");
     if(style.italic)css.push("font-style:italic");
     if(style.underline)css.push("text-decoration:underline");
-    if(style.fontSize)css.push(`font-size:${Math.max(8,Math.min(24,Number(style.fontSize)))}px`);
+    if(style.fontSize)css.push(`font-size:${Math.max(8,Math.min(30,Number(style.fontSize)))}px`);
     if(style.fontName)css.push(`font-family:${JSON.stringify(style.fontName)},Arial,sans-serif`);
     if(style.horizontal&&["left","center","right","justify"].includes(style.horizontal))css.push(`text-align:${style.horizontal}`);
     if(style.vertical&&["top","center","bottom"].includes(style.vertical))css.push(`vertical-align:${style.vertical==="center"?"middle":style.vertical}`);
-    if(style.wrapText)css.push("white-space:normal");
-    for(const side of ["top","right","bottom","left"]){const b=style.border?.[side];if(!b?.style)continue;const width=/medium|thick/i.test(b.style)?2:1;const line=/dash/i.test(b.style)?"dashed":/dot/i.test(b.style)?"dotted":"solid";css.push(`border-${side}:${width}px ${line} ${b.color||"#cbd5e1"}`);}
+    if(style.wrapText)css.push("white-space:normal;overflow:visible;text-overflow:clip");
+    for(const side of ["top","right","bottom","left"]){const b=style.border?.[side];if(!b?.style)continue;const width=/medium|thick|double/i.test(b.style)?2:1;const line=/dash/i.test(b.style)?"dashed":/dot/i.test(b.style)?"dotted":/double/i.test(b.style)?"double":"solid";css.push(`border-${side}:${width}px ${line} ${b.color||"#cbd5e1"}`);}
     return css.join(";");
+  }
+
+  function excelCellText(sheet,rows,rowNumber,colNumber){
+    const ref=`${excelColumnLabel(colNumber-1)}${rowNumber}`,cell=sheet?.[ref];
+    return cell?.w!==undefined?String(cell.w):String(rows?.[rowNumber-1]?.[colNumber-1]??"");
+  }
+
+  function excelValueCompare(a,b){
+    const na=Number(String(a).replace(/[%,$\s]/g,"")),nb=Number(String(b).replace(/[%,$\s]/g,""));
+    if(String(a).trim()!==""&&String(b).trim()!==""&&Number.isFinite(na)&&Number.isFinite(nb))return na-nb;
+    const da=Date.parse(a),db=Date.parse(b);if(Number.isFinite(da)&&Number.isFinite(db))return da-db;
+    return String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"});
   }
 
   async function parseXlsxVisuals(buffer,workbook){
     if(!window.JSZip)return null;
-    const zip=await window.JSZip.loadAsync(buffer);
-    const parser=new DOMParser();
+    const zip=await window.JSZip.loadAsync(buffer),parser=new DOMParser();
     const xml=async name=>{const f=zip.file(name);return f?parser.parseFromString(await f.async("string"),"application/xml"):null;};
-    const stylesDoc=await xml("xl/styles.xml");
-    if(!stylesDoc)return null;
-    const fonts=[...stylesDoc.getElementsByTagName("font")].map(n=>({bold:!!n.getElementsByTagName("b")[0],italic:!!n.getElementsByTagName("i")[0],underline:!!n.getElementsByTagName("u")[0],color:ooxmlRgb(n.getElementsByTagName("color")[0]),fontSize:Number(n.getElementsByTagName("sz")[0]?.getAttribute("val")||0),fontName:n.getElementsByTagName("name")[0]?.getAttribute("val")||""}));
-    const fills=[...stylesDoc.getElementsByTagName("fill")].map(n=>{const p=n.getElementsByTagName("patternFill")[0];if(!p)return "";const fg=ooxmlRgb(p.getElementsByTagName("fgColor")[0]);const bg=ooxmlRgb(p.getElementsByTagName("bgColor")[0]);return fg||bg||"";});
-    const borderNodes=[...stylesDoc.getElementsByTagName("border")];
-    const borders=borderNodes.map(n=>{const out={};for(const side of ["left","right","top","bottom"]){const el=n.getElementsByTagName(side)[0];if(el?.getAttribute("style"))out[side]={style:el.getAttribute("style"),color:ooxmlRgb(el.getElementsByTagName("color")[0])};}return out;});
+    const themeDoc=await xml("xl/theme/theme1.xml"),themeColors=[];
+    if(themeDoc){const clrScheme=themeDoc.getElementsByTagName("a:clrScheme")[0]||[...themeDoc.getElementsByTagName("clrScheme")][0];if(clrScheme){const order=["dk1","lt1","dk2","lt2","accent1","accent2","accent3","accent4","accent5","accent6","hlink","folHlink"];for(const key of order){const el=[...clrScheme.children].find(n=>n.localName===key);const colorEl=el?.firstElementChild;const val=colorEl?.getAttribute?.("lastClr")||colorEl?.getAttribute?.("val")||"";themeColors.push(excelHexColor(val));}}}
+    const stylesDoc=await xml("xl/styles.xml");if(!stylesDoc)return null;
+    const fonts=[...stylesDoc.getElementsByTagName("font")].map(n=>({bold:!!n.getElementsByTagName("b")[0],italic:!!n.getElementsByTagName("i")[0],underline:!!n.getElementsByTagName("u")[0],color:ooxmlRgb(n.getElementsByTagName("color")[0],themeColors),fontSize:Number(n.getElementsByTagName("sz")[0]?.getAttribute("val")||0),fontName:n.getElementsByTagName("name")[0]?.getAttribute("val")||""}));
+    const fills=[...stylesDoc.getElementsByTagName("fill")].map(n=>{const p=n.getElementsByTagName("patternFill")[0];if(!p||!p.getAttribute("patternType")||p.getAttribute("patternType")==="none")return "";const fg=ooxmlRgb(p.getElementsByTagName("fgColor")[0],themeColors),bg=ooxmlRgb(p.getElementsByTagName("bgColor")[0],themeColors);return fg||bg||"";});
+    const borders=[...stylesDoc.getElementsByTagName("border")].map(n=>{const out={};for(const side of ["left","right","top","bottom"]){const el=[...n.children].find(x=>x.localName===side);if(el?.getAttribute("style"))out[side]={style:el.getAttribute("style"),color:ooxmlRgb(el.getElementsByTagName("color")[0],themeColors)};}return out;});
     const xfsParent=stylesDoc.getElementsByTagName("cellXfs")[0];
-    const xfs=xfsParent?[...xfsParent.children].filter(n=>n.localName==="xf").map(x=>{const font=fonts[Number(x.getAttribute("fontId")||0)]||{},fill=fills[Number(x.getAttribute("fillId")||0)]||"",border=borders[Number(x.getAttribute("borderId")||0)]||{};const a=x.getElementsByTagName("alignment")[0];return {...font,fill,border,horizontal:a?.getAttribute("horizontal")||"",vertical:a?.getAttribute("vertical")||"",wrapText:a?.getAttribute("wrapText")==="1"};}):[];
-
-    const wbDoc=await xml("xl/workbook.xml"),relsDoc=await xml("xl/_rels/workbook.xml.rels");
-    const relMap=new Map();
+    const xfs=xfsParent?[...xfsParent.children].filter(n=>n.localName==="xf").map(x=>{const font=fonts[Number(x.getAttribute("fontId")||0)]||{},fill=fills[Number(x.getAttribute("fillId")||0)]||"",border=borders[Number(x.getAttribute("borderId")||0)]||{};const a=[...x.children].find(n=>n.localName==="alignment");return {...font,fill,border,horizontal:a?.getAttribute("horizontal")||"",vertical:a?.getAttribute("vertical")||"",wrapText:a?.getAttribute("wrapText")==="1"};}):[];
+    const wbDoc=await xml("xl/workbook.xml"),relsDoc=await xml("xl/_rels/workbook.xml.rels"),relMap=new Map();
     if(relsDoc)for(const r of [...relsDoc.getElementsByTagName("Relationship")])relMap.set(r.getAttribute("Id"),r.getAttribute("Target"));
     const sheetPathByName=new Map();
-    if(wbDoc)for(const s of [...wbDoc.getElementsByTagName("sheet")]){const name=s.getAttribute("name")||"";const rid=s.getAttribute("r:id")||s.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");let target=relMap.get(rid)||"";target=target.replace(/^\//,"");if(target&&!target.startsWith("xl/"))target=`xl/${target.replace(/^\.\//,"")}`;if(name&&target)sheetPathByName.set(name,target);}
-
+    if(wbDoc)for(const s of [...wbDoc.getElementsByTagName("sheet")]){const name=s.getAttribute("name")||"",rid=s.getAttribute("r:id")||s.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");let target=relMap.get(rid)||"";target=target.replace(/^\//,"");if(target&&!target.startsWith("xl/"))target=`xl/${target.replace(/^\.\//,"")}`;if(name&&target)sheetPathByName.set(name,target);}
     const sheets={};
     for(const name of workbook.SheetNames||[]){
-      let path=sheetPathByName.get(name);
-      if(!path){const idx=(workbook.SheetNames||[]).indexOf(name)+1;path=`xl/worksheets/sheet${idx}.xml`;}
+      let path=sheetPathByName.get(name);if(!path){const idx=(workbook.SheetNames||[]).indexOf(name)+1;path=`xl/worksheets/sheet${idx}.xml`;}
       const doc=await xml(path);if(!doc)continue;
-      const cellStyles={},rowHeights={},colWidths={},merges=[];
+      const cellStyles={},rowHeights={},colWidths={},hiddenRows=new Set(),hiddenCols=new Set(),merges=[];
       for(const c of [...doc.getElementsByTagName("c")]){const ref=c.getAttribute("r"),sid=Number(c.getAttribute("s")||0);if(ref&&xfs[sid])cellStyles[ref]=xfs[sid];}
-      for(const row of [...doc.getElementsByTagName("row")]){const r=Number(row.getAttribute("r")||0),ht=Number(row.getAttribute("ht")||0);if(r&&ht)rowHeights[r]=ht;}
-      for(const col of [...doc.getElementsByTagName("col")]){const min=Number(col.getAttribute("min")||0),max=Number(col.getAttribute("max")||min),width=Number(col.getAttribute("width")||0);if(width)for(let c=min;c<=max;c++)colWidths[c]=width;}
+      for(const row of [...doc.getElementsByTagName("row")]){const r=Number(row.getAttribute("r")||0),ht=Number(row.getAttribute("ht")||0);if(r&&ht)rowHeights[r]=ht;if(r&&row.getAttribute("hidden")==="1")hiddenRows.add(r);}
+      for(const col of [...doc.getElementsByTagName("col")]){const min=Number(col.getAttribute("min")||0),max=Number(col.getAttribute("max")||min),width=Number(col.getAttribute("width")||0);for(let c=min;c<=max;c++){if(width)colWidths[c]=width;if(col.getAttribute("hidden")==="1")hiddenCols.add(c);}}
       for(const m of [...doc.getElementsByTagName("mergeCell")]){const ref=m.getAttribute("ref");if(ref)merges.push(ref);}
-      sheets[name]={cellStyles,rowHeights,colWidths,merges};
+      const pane=doc.getElementsByTagName("pane")[0],freezeRows=Math.max(0,Number(pane?.getAttribute("ySplit")||0)),freezeCols=Math.max(0,Number(pane?.getAttribute("xSplit")||0));
+      let autoFilterRef=doc.getElementsByTagName("autoFilter")[0]?.getAttribute("ref")||"",tableStyleName="";
+      const sheetDir=path.slice(0,path.lastIndexOf("/")),fileName=path.slice(path.lastIndexOf("/")+1),sheetRelDoc=await xml(`${sheetDir}/_rels/${fileName}.rels`);
+      const sheetRelMap=new Map();if(sheetRelDoc)for(const r of [...sheetRelDoc.getElementsByTagName("Relationship")])sheetRelMap.set(r.getAttribute("Id"),r.getAttribute("Target"));
+      const tablePart=doc.getElementsByTagName("tablePart")[0];
+      if(tablePart){const rid=tablePart.getAttribute("r:id")||tablePart.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id"),target=sheetRelMap.get(rid)||"";if(target){let tp="";if(target.startsWith("/"))tp=target.replace(/^\//,"");else{const parts=sheetDir.split("/");for(const seg of target.split("/")){if(!seg||seg===".")continue;if(seg==="..")parts.pop();else parts.push(seg);}tp=parts.join("/");}const tableDoc=await xml(tp);if(tableDoc){autoFilterRef=tableDoc.documentElement?.getAttribute("ref")||tableDoc.getElementsByTagName("autoFilter")[0]?.getAttribute("ref")||autoFilterRef;tableStyleName=tableDoc.getElementsByTagName("tableStyleInfo")[0]?.getAttribute("name")||"";}}}
+      const tabColor=ooxmlRgb(doc.getElementsByTagName("tabColor")[0],themeColors);
+      sheets[name]={cellStyles,rowHeights,colWidths,hiddenRows:[...hiddenRows],hiddenCols:[...hiddenCols],merges,freezeRows,freezeCols,autoFilterRef,tableStyleName,tabColor};
     }
     return {sheets};
   }
@@ -784,27 +815,57 @@
     return {masters,covered};
   }
 
+  function excelFilterRange(visual){
+    if(!visual?.autoFilterRef)return null;
+    try{const r=window.XLSX.utils.decode_range(visual.autoFilterRef);return {startRow:r.s.r+1,endRow:r.e.r+1,startCol:r.s.c+1,endCol:r.e.c+1};}catch{return null;}
+  }
+
+  function getExcelSheetState(runtime,sheetName){
+    runtime.sheetState=runtime.sheetState||{};
+    return runtime.sheetState[sheetName]||(runtime.sheetState[sheetName]={filters:{},sort:null});
+  }
+
   function renderSheetJsWorkbook(doc,content,runtime){
-    const workbook=runtime.workbook;
-    const sheetNames=Array.isArray(workbook?.SheetNames)?workbook.SheetNames:[];
+    const workbook=runtime.workbook,sheetNames=Array.isArray(workbook?.SheetNames)?workbook.SheetNames:[];
     if(!sheetNames.length){content.innerHTML='<div class="doc-empty">This workbook does not contain any worksheets.</div>';return;}
     const sheetIndex=Math.max(0,Math.min(Number(runtime.sheetIndex||0),sheetNames.length-1));runtime.sheetIndex=sheetIndex;
     const sheetName=sheetNames[sheetIndex],sheet=workbook.Sheets[sheetName],rows=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false,blankrows:true});
-    const visual=runtime.ooxml?.sheets?.[sheetName]||null;
-    const range=sheet?.["!ref"]?window.XLSX.utils.decode_range(sheet["!ref"]):null;
-    const totalRows=Math.max(1,range?range.e.r+1:rows.length),totalCols=Math.max(1,range?range.e.c+1:Math.max(0,...rows.map(r=>Array.isArray(r)?r.length:0))),maxRows=Math.min(totalRows,1000),maxCols=Math.min(totalCols,80);
-    const mergeInfo=mergeInfoFromRefs(visual?.merges||sheet?.["!merges"]?.map(m=>window.XLSX.utils.encode_range(m))||[]);
-    const header=`<thead><tr><th class="excel-corner"></th>${Array.from({length:maxCols},(_,i)=>{const width=Math.max(54,Math.min(320,Math.round(Number(visual?.colWidths?.[i+1]||12)*7.2)));return `<th class="excel-col-head" style="width:${width}px;min-width:${width}px">${excelColumnLabel(i)}</th>`;}).join("")}</tr></thead>`;
-    const body=Array.from({length:maxRows},(_,rowIndex)=>{const rowNumber=rowIndex+1,row=rows[rowIndex]||[],height=visual?.rowHeights?.[rowNumber]?` style="height:${Math.max(20,Number(visual.rowHeights[rowNumber])*1.333)}px"`:"";const cells=[];for(let ci=1;ci<=maxCols;ci++){if(mergeInfo.covered.has(`${rowNumber}:${ci}`))continue;const ref=`${excelColumnLabel(ci-1)}${rowNumber}`,cell=sheet?.[ref],text=cell?.w!==undefined?String(cell.w):String(row?.[ci-1]??""),formula=cell?.f?`=${cell.f}`:text,style=ooxmlStyleCss(visual?.cellStyles?.[ref]),merge=mergeInfo.masters.get(`${rowNumber}:${ci}`),spans=`${merge?.rowSpan>1?` rowspan="${merge.rowSpan}"`:""}${merge?.colSpan>1?` colspan="${merge.colSpan}"`:""}`;cells.push(`<td tabindex="0" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" title="${esc(text)}"${spans}${style?` style="${esc(style)}"`:""}>${esc(text)}</td>`);}return `<tr data-excel-row="${rowIndex}"${height}><th class="excel-row-head">${rowNumber}</th>${cells.join("")}</tr>`;}).join("");
-    content.innerHTML=`<div class="excel-viewer-shell"><div class="excel-viewer-head"><div class="excel-file-mark">X</div><div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${sheetNames.length} sheet${sheetNames.length===1?"":"s"} · ${totalRows.toLocaleString()} rows · ${totalCols.toLocaleString()} columns</span></div><span class="excel-local-badge">Local preview</span><label class="excel-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search this sheet" data-excel-search /></label></div><div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div><div class="excel-grid-wrap"><table class="excel-grid">${header}<tbody>${body}</tbody></table></div><div class="excel-footer"><div class="excel-sheet-tabs">${sheetNames.map((n,i)=>`<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" data-excel-sheet="${i}">${esc(n)}</button>`).join("")}</div><div class="excel-sheet-stats"><span>${maxRows.toLocaleString()} / ${totalRows.toLocaleString()} rows</span><span>${maxCols} / ${totalCols} columns</span>${totalRows>1000||totalCols>80?'<span class="excel-limit-note">Preview limited for performance</span>':''}</div></div></div>`;
-    bindExcelViewerEvents(doc,content,runtime);
+    const visual=runtime.ooxml?.sheets?.[sheetName]||null,stateForSheet=getExcelSheetState(runtime,sheetName),filterRange=excelFilterRange(visual);
+    const range=sheet?.["!ref"]?window.XLSX.utils.decode_range(sheet["!ref"]):null,totalRows=Math.max(1,range?range.e.r+1:rows.length),totalCols=Math.max(1,range?range.e.c+1:Math.max(0,...rows.map(r=>Array.isArray(r)?r.length:0))),maxRows=Math.min(totalRows,1000),maxCols=Math.min(totalCols,80);
+    const mergeInfo=mergeInfoFromRefs(visual?.merges||sheet?.["!merges"]?.map(m=>window.XLSX.utils.encode_range(m))||[]),hiddenRows=new Set(visual?.hiddenRows||[]),hiddenCols=new Set(visual?.hiddenCols||[]);
+    const colWidths=Array.from({length:maxCols},(_,i)=>Math.max(54,Math.min(360,Math.round(Number(visual?.colWidths?.[i+1]||12)*7.2))));
+    const visibleCols=Array.from({length:maxCols},(_,i)=>i+1).filter(c=>!hiddenCols.has(c));
+    let rowOrder=Array.from({length:maxRows},(_,i)=>i+1).filter(r=>!hiddenRows.has(r));
+    if(filterRange){const {startRow,endRow,startCol,endCol}=filterRange;rowOrder=rowOrder.filter(r=>{if(r<=startRow||r>endRow)return true;for(let c=startCol;c<=endCol;c++){const selected=stateForSheet.filters[c];if(selected&&selected.size&&!selected.has(excelCellText(sheet,rows,r,c)))return false;}return true;});if(stateForSheet.sort?.col){const fixed=rowOrder.filter(r=>r<=startRow||r>endRow),data=rowOrder.filter(r=>r>startRow&&r<=endRow);data.sort((ra,rb)=>excelValueCompare(excelCellText(sheet,rows,ra,stateForSheet.sort.col),excelCellText(sheet,rows,rb,stateForSheet.sort.col))*(stateForSheet.sort.dir==="desc"?-1:1));rowOrder=[...fixed.filter(r=>r<=startRow),...data,...fixed.filter(r=>r>endRow)];}}
+    const header=`<thead><tr><th class="excel-corner"></th>${visibleCols.map(ci=>`<th class="excel-col-head" style="width:${colWidths[ci-1]}px;min-width:${colWidths[ci-1]}px">${excelColumnLabel(ci-1)}</th>`).join("")}</tr></thead>`;
+    let visibleDataRows=0;
+    const body=rowOrder.map(rowNumber=>{if(filterRange&&rowNumber>filterRange.startRow&&rowNumber<=filterRange.endRow)visibleDataRows++;const height=visual?.rowHeights?.[rowNumber]?Math.max(20,Number(visual.rowHeights[rowNumber])*1.333):30,cells=[];for(const ci of visibleCols){if(mergeInfo.covered.has(`${rowNumber}:${ci}`))continue;const ref=`${excelColumnLabel(ci-1)}${rowNumber}`,cell=sheet?.[ref],text=excelCellText(sheet,rows,rowNumber,ci),formula=cell?.f?`=${cell.f}`:text,merge=mergeInfo.masters.get(`${rowNumber}:${ci}`);let style=ooxmlStyleCss(visual?.cellStyles?.[ref]);const spans=`${merge?.rowSpan>1?` rowspan="${merge.rowSpan}"`:""}${merge?.colSpan>1?` colspan="${merge.colSpan}"`:""}`;let freezeClass="",freezeStyle="";if(rowNumber<=Number(visual?.freezeRows||0)){freezeClass+=" excel-frozen-row";freezeStyle+=`position:sticky;top:${28+(rowNumber-1)*30}px;z-index:3;`;}if(ci<=Number(visual?.freezeCols||0)){freezeClass+=" excel-frozen-col";const left=48+colWidths.slice(0,ci-1).reduce((a,b)=>a+b,0);freezeStyle+=`position:sticky;left:${left}px;z-index:${rowNumber<=Number(visual?.freezeRows||0)?4:2};`;}const isFilter=filterRange&&rowNumber===filterRange.startRow&&ci>=filterRange.startCol&&ci<=filterRange.endCol,filterActive=!!stateForSheet.filters[ci]?.size||stateForSheet.sort?.col===ci;const contentHtml=isFilter?`<span class="excel-filter-head-label">${esc(text)}</span><button type="button" class="excel-filter-btn ${filterActive?"active":""}" data-excel-filter-col="${ci}" title="Filter / sort ${esc(text)}">${filterActive?"●":"▾"}</button>`:esc(text);cells.push(`<td tabindex="0" class="${freezeClass.trim()} ${isFilter?"excel-filter-head":""}" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" data-excel-row-number="${rowNumber}" data-excel-col-number="${ci}" title="${esc(text)}"${spans} style="${esc(`${style}${style&&freezeStyle?";":""}${freezeStyle}`)}">${contentHtml}</td>`);}return `<tr data-excel-row="${rowNumber}" style="height:${height}px"><th class="excel-row-head">${rowNumber}</th>${cells.join("")}</tr>`;}).join("");
+    const filterSummary=filterRange?`<span>${visibleDataRows} / ${Math.max(0,Math.min(maxRows,filterRange.endRow)-filterRange.startRow)} filtered rows</span>`:"";
+    content.innerHTML=`<div class="excel-viewer-shell"><div class="excel-viewer-head"><div class="excel-file-mark">X</div><div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${sheetNames.length} sheet${sheetNames.length===1?"":"s"} · ${totalRows.toLocaleString()} rows · ${totalCols.toLocaleString()} columns</span></div><span class="excel-local-badge">Local preview</span><label class="excel-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search this sheet" data-excel-search /></label></div><div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div><div class="excel-grid-wrap"><table class="excel-grid">${header}<tbody>${body}</tbody></table></div><div class="excel-footer"><div class="excel-sheet-tabs">${sheetNames.map((n,i)=>{const tabColor=runtime.ooxml?.sheets?.[n]?.tabColor||"";return `<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" data-excel-sheet="${i}"${tabColor?` style="--excel-tab-color:${esc(tabColor)}"`:""}>${tabColor?'<i class="excel-tab-dot"></i>':""}<span>${esc(n)}</span></button>`;}).join("")}</div><div class="excel-sheet-stats">${filterSummary}<span>${rowOrder.length.toLocaleString()} visible rows</span><span>${visibleCols.length} / ${totalCols} columns</span>${totalRows>1000||totalCols>80?'<span class="excel-limit-note">Preview limited for performance</span>':""}</div></div><div class="excel-filter-menu" data-excel-filter-menu hidden></div></div>`;
+    bindExcelViewerEvents(doc,content,runtime,{sheetName,sheet,rows,visual,filterRange});
   }
 
-  function bindExcelViewerEvents(doc,content,runtime){
-    const search=$("[data-excel-search]",content);
-    search?.addEventListener("input",()=>{const q=search.value.trim().toLowerCase();$$("tbody tr",content).forEach(tr=>tr.classList.toggle("excel-row-hidden",!!q&&!tr.textContent.toLowerCase().includes(q)));});
-    $$("[data-excel-sheet]",content).forEach(btn=>btn.addEventListener("click",()=>{runtime.sheetIndex=Number(btn.dataset.excelSheet||0);renderExcelWorkbook(doc,content);}));
-    $$("[data-excel-cell]",content).forEach(cell=>cell.addEventListener("click",()=>{$$(".excel-grid td.is-selected",content).forEach(x=>x.classList.remove("is-selected"));cell.classList.add("is-selected");const name=$("[data-excel-name]",content),formula=$("[data-excel-formula]",content);if(name)name.textContent=cell.dataset.excelCell||"";if(formula)formula.textContent=cell.dataset.excelValue||"";}));
+  function openExcelFilterMenu(content,runtime,ctx,col,button){
+    const {sheetName,sheet,rows,filterRange}=ctx;if(!filterRange)return;const stateForSheet=getExcelSheetState(runtime,sheetName),values=[];
+    for(let r=filterRange.startRow+1;r<=filterRange.endRow;r++){const v=excelCellText(sheet,rows,r,col);if(!values.includes(v))values.push(v);}values.sort(excelValueCompare);
+    const active=stateForSheet.filters[col],selected=active?new Set(active):new Set(values),menu=$("[data-excel-filter-menu]",content);if(!menu)return;
+    menu.innerHTML=`<div class="excel-filter-menu-head"><strong>${esc(excelCellText(sheet,rows,filterRange.startRow,col)||excelColumnLabel(col-1))}</strong><button type="button" data-filter-close>×</button></div><div class="excel-filter-sort"><button type="button" data-filter-sort="asc">↑ Sort A → Z</button><button type="button" data-filter-sort="desc">↓ Sort Z → A</button></div><label class="excel-filter-search"><span>⌕</span><input type="search" placeholder="Search values" data-filter-search></label><div class="excel-filter-actions"><button type="button" data-filter-select-all>Select all</button><button type="button" data-filter-clear>Clear</button></div><div class="excel-filter-values">${values.map((v,i)=>`<label data-filter-value-row><input type="checkbox" value="${esc(v)}" ${selected.has(v)?"checked":""}><span>${esc(v||"(Blank)")}</span></label>`).join("")}</div><div class="excel-filter-menu-foot"><button type="button" class="btn small" data-filter-cancel>Cancel</button><button type="button" class="btn small primary" data-filter-apply>Apply</button></div>`;
+    menu.hidden=false;const rect=button.getBoundingClientRect();menu.style.left=`${Math.min(window.innerWidth-300,Math.max(8,rect.left))}px`;menu.style.top=`${Math.min(window.innerHeight-390,rect.bottom+4)}px`;
+    const close=()=>{menu.hidden=true;};$("[data-filter-close]",menu)?.addEventListener("click",close);$("[data-filter-cancel]",menu)?.addEventListener("click",close);
+    $("[data-filter-search]",menu)?.addEventListener("input",e=>{const q=String(e.target.value||"").toLowerCase();$$('[data-filter-value-row]',menu).forEach(row=>row.hidden=!!q&&!row.textContent.toLowerCase().includes(q));});
+    $("[data-filter-select-all]",menu)?.addEventListener("click",()=>$$('input[type="checkbox"]',menu).forEach(x=>{if(!x.closest('[data-filter-value-row]')?.hidden)x.checked=true;}));
+    $("[data-filter-clear]",menu)?.addEventListener("click",()=>$$('input[type="checkbox"]',menu).forEach(x=>x.checked=false));
+    $$('[data-filter-sort]',menu).forEach(b=>b.addEventListener("click",()=>{stateForSheet.sort={col,dir:b.dataset.filterSort};close();renderExcelWorkbook({id:runtime.docId||"",name:runtime.docName||"Workbook"},content);}));
+    $("[data-filter-apply]",menu)?.addEventListener("click",()=>{const checked=new Set($$('input[type="checkbox"]:checked',menu).map(x=>x.value));if(checked.size===values.length)delete stateForSheet.filters[col];else stateForSheet.filters[col]=checked;close();renderExcelWorkbook({id:runtime.docId||"",name:runtime.docName||"Workbook"},content);});
+  }
+
+  function bindExcelViewerEvents(doc,content,runtime,ctx){
+    runtime.docId=doc.id;runtime.docName=doc.name;
+    const search=$("[data-excel-search]",content);search?.addEventListener("input",()=>{const q=search.value.trim().toLowerCase();$$("tbody tr",content).forEach(tr=>tr.classList.toggle("excel-row-hidden",!!q&&!tr.textContent.toLowerCase().includes(q)));});
+    $$('[data-excel-sheet]',content).forEach(btn=>btn.addEventListener("click",()=>{runtime.sheetIndex=Number(btn.dataset.excelSheet||0);renderExcelWorkbook(doc,content);}));
+    $$('[data-excel-cell]',content).forEach(cell=>cell.addEventListener("click",e=>{if(e.target.closest('[data-excel-filter-col]'))return;$$('.excel-grid td.is-selected',content).forEach(x=>x.classList.remove('is-selected'));cell.classList.add('is-selected');const name=$("[data-excel-name]",content),formula=$("[data-excel-formula]",content);if(name)name.textContent=cell.dataset.excelCell||"";if(formula)formula.textContent=cell.dataset.excelValue||"";}));
+    $$('[data-excel-filter-col]',content).forEach(btn=>btn.addEventListener("click",e=>{e.stopPropagation();openExcelFilterMenu(content,runtime,ctx,Number(btn.dataset.excelFilterCol||0),btn);}));
+    document.addEventListener("keydown",e=>{if(e.key==="Escape"){const menu=$("[data-excel-filter-menu]",content);if(menu)menu.hidden=true;}},{once:true});
   }
 
   function renderExcelWorkbook(doc,content){
