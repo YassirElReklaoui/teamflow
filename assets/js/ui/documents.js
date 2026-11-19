@@ -599,6 +599,51 @@
     let n=index+1,label="";while(n){const r=(n-1)%26;label=String.fromCharCode(65+r)+label;n=Math.floor((n-1)/26);}return label;
   }
 
+  function excelColor(color){
+    if(!color)return "";
+    const raw=String(color.rgb||color.RGB||"").replace(/^#/,'');
+    if(raw){const hex=raw.length===8?raw.slice(-6):raw.slice(-6);return /^[0-9a-f]{6}$/i.test(hex)?`#${hex}`:"";}
+    const indexed={0:"#000000",1:"#FFFFFF",2:"#FF0000",3:"#00FF00",4:"#0000FF",5:"#FFFF00",6:"#FF00FF",7:"#00FFFF",8:"#000000",9:"#FFFFFF",10:"#FF0000",11:"#00FF00",12:"#0000FF",13:"#FFFF00",14:"#FF00FF",15:"#00FFFF",16:"#800000",17:"#008000",18:"#000080",19:"#808000",20:"#800080",21:"#008080",22:"#C0C0C0",23:"#808080"};
+    if(color.indexed!==undefined&&indexed[color.indexed]!==undefined)return indexed[color.indexed];
+    return "";
+  }
+
+  function excelResolvedStyle(workbook,cell){
+    if(!cell?.s)return null;
+    if(typeof cell.s==="object")return cell.s;
+    const styles=workbook?.Styles||workbook?.styles;
+    const xf=styles?.CellXf?.[cell.s]||styles?.cellXf?.[cell.s];
+    if(!xf)return null;
+    return {font:styles?.Fonts?.[xf.fontId],fill:styles?.Fills?.[xf.fillId],border:styles?.Borders?.[xf.borderId],alignment:xf.alignment||null};
+  }
+
+  function excelCellStyle(workbook,cell){
+    const s=excelResolvedStyle(workbook,cell);
+    if(!s)return "";
+    const css=[];
+    const fill=s.fill||s.Fill;
+    const fillColor=excelColor(fill?.fgColor||fill?.fgcolor||fill?.bgColor||fill?.bgcolor);
+    if(fillColor&&fill?.patternType!=="none")css.push(`background-color:${fillColor}`);
+    const font=s.font||s.Font;
+    const fontColor=excelColor(font?.color);
+    if(fontColor)css.push(`color:${fontColor}`);
+    if(font?.bold||font?.b)css.push("font-weight:700");
+    if(font?.italic||font?.i)css.push("font-style:italic");
+    if(font?.underline||font?.u)css.push("text-decoration:underline");
+    const alignment=s.alignment||s.Alignment;
+    if(alignment?.horizontal&&["left","center","right","justify"].includes(alignment.horizontal))css.push(`text-align:${alignment.horizontal}`);
+    if(alignment?.vertical&&["top","center","bottom"].includes(alignment.vertical))css.push(`vertical-align:${alignment.vertical==="center"?"middle":alignment.vertical}`);
+    if(alignment?.wrapText||alignment?.wrap)css.push("white-space:normal");
+    const border=s.border||s.Border;
+    for(const side of ["top","right","bottom","left"]){const b=border?.[side];const c=excelColor(b?.color);if(b?.style)css.push(`border-${side}:1px solid ${c||"#cbd5e1"}`);}
+    return css.join(";");
+  }
+
+  function excelDisplayValue(cell){
+    if(!cell)return "";
+    try{return cell.w!==undefined?String(cell.w):String(window.XLSX.utils.format_cell(cell)||"");}catch(_){return cell.v==null?"":String(cell.v);}
+  }
+
   function renderExcelWorkbook(doc,content){
     const runtime=runtimeExcelBooks.get(doc.id);
     if(!runtime?.workbook){
@@ -621,7 +666,7 @@
     const maxCols=Math.min(totalCols,80);
     const visibleRows=rows.slice(0,maxRows);
     const header=`<thead><tr><th class="excel-corner"></th>${Array.from({length:maxCols},(_,i)=>`<th class="excel-col-head">${excelColumnLabel(i)}</th>`).join("")}</tr></thead>`;
-    const body=visibleRows.map((row,rowIndex)=>`<tr data-excel-row="${rowIndex}"><th class="excel-row-head">${rowIndex+1}</th>${Array.from({length:maxCols},(_,colIndex)=>{const value=Array.isArray(row)?row[colIndex]:"";const text=value==null?"":String(value);const ref=`${excelColumnLabel(colIndex)}${rowIndex+1}`;return `<td tabindex="0" data-excel-cell="${ref}" data-excel-value="${esc(text)}" title="${esc(text)}">${esc(text)}</td>`;}).join("")}</tr>`).join("");
+    const body=visibleRows.map((row,rowIndex)=>`<tr data-excel-row="${rowIndex}"><th class="excel-row-head">${rowIndex+1}</th>${Array.from({length:maxCols},(_,colIndex)=>{const ref=`${excelColumnLabel(colIndex)}${rowIndex+1}`;const cell=sheet?.[ref];const text=cell?excelDisplayValue(cell):(Array.isArray(row)&&row[colIndex]!=null?String(row[colIndex]):"");const style=excelCellStyle(workbook,cell);const formula=cell?.f?`=${cell.f}`:text;return `<td tabindex="0" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" title="${esc(text)}"${style?` style="${esc(style)}"`:""}>${esc(text)}</td>`;}).join("")}</tr>`).join("");
     content.innerHTML=`
       <div class="excel-viewer-shell">
         <div class="excel-viewer-head">
@@ -659,7 +704,7 @@
       if(file.size>20*1024*1024){toast("File is too large for the preview. Maximum size is 20 MB");return;}
       if(!window.XLSX){toast("Excel reader could not load. Check your connection and refresh TeamFlow.");return;}
       const buffer=await file.arrayBuffer();
-      const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true});
+      const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true,cellStyles:true});
       const id=`excel-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
       runtimeExcelBooks.set(id,{workbook,sheetIndex:0});
       state.documents.push({id,name:file.name,kind:"excel-local",size:file.size,createdAt:new Date().toISOString()});
