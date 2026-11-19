@@ -763,8 +763,30 @@
           const msg=String(loadErr?.message||loadErr||"");
           if(!/anchors|drawing/i.test(msg))throw loadErr;
           tfLogError("ExcelJS drawing metadata skipped",loadErr,{name:file.name});
+          if(!window.JSZip)throw loadErr;
+          const zip=await window.JSZip.loadAsync(buffer);
+          const relFiles=Object.keys(zip.files).filter(n=>/^xl\/worksheets\/_rels\/sheet\d+\.xml\.rels$/i.test(n));
+          for(const relName of relFiles){
+            const relFile=zip.file(relName);
+            if(!relFile)continue;
+            let xml=await relFile.async("string");
+            xml=xml.replace(/<Relationship\b[^>]*Type=["'][^"']*\/(?:drawing|vmlDrawing)["'][^>]*\/?>(?:<\/Relationship>)?/gi,"");
+            zip.file(relName,xml);
+          }
+          for(const name of Object.keys(zip.files)){
+            if(/^xl\/drawings\//i.test(name)||/^xl\/charts\//i.test(name))zip.remove(name);
+          }
+          const sheetFiles=Object.keys(zip.files).filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/i.test(n));
+          for(const sheetName of sheetFiles){
+            const sheetFile=zip.file(sheetName);
+            if(!sheetFile)continue;
+            let xml=await sheetFile.async("string");
+            xml=xml.replace(/<drawing\b[^>]*\/?>(?:<\/drawing>)?/gi,"").replace(/<legacyDrawing\b[^>]*\/?>(?:<\/legacyDrawing>)?/gi,"");
+            zip.file(sheetName,xml);
+          }
+          const cleanBuffer=await zip.generateAsync({type:"arraybuffer",compression:"DEFLATE"});
           workbook=new window.ExcelJS.Workbook();
-          await workbook.xlsx.load(buffer,{ignoreNodes:["drawing","legacyDrawing","picture","extLst"]});
+          await workbook.xlsx.load(cleanBuffer);
         }
         runtimeExcelBooks.set(id,{excelWorkbook:workbook,sheetIndex:0});
       }else{
