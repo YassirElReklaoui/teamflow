@@ -1,6 +1,7 @@
 "use strict";
 
 // TeamFlow modular build — generated from the verified granular API runtime.
+  const runtimeExcelBooks = new Map();
   function openSharePointModal(){
     $("#modalRoot").innerHTML=`
       <div class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Add SharePoint document">
@@ -593,20 +594,97 @@
     }));
   }
 
+  function excelColumnLabel(index){
+    if(window.XLSX?.utils?.encode_col)return window.XLSX.utils.encode_col(index);
+    let n=index+1,label="";while(n){const r=(n-1)%26;label=String.fromCharCode(65+r)+label;n=Math.floor((n-1)/26);}return label;
+  }
+
+  function renderExcelWorkbook(doc,content){
+    const runtime=runtimeExcelBooks.get(doc.id);
+    if(!runtime?.workbook){
+      content.innerHTML=`<div class="doc-empty excel-missing"><strong>Excel preview is session-only.</strong><span>Choose the workbook again to preview it. Backend storage will be added after the viewer is approved.</span></div>`;
+      return;
+    }
+    const workbook=runtime.workbook;
+    const sheetNames=Array.isArray(workbook.SheetNames)?workbook.SheetNames:[];
+    if(!sheetNames.length){content.innerHTML='<div class="doc-empty">This workbook does not contain any worksheets.</div>';return;}
+    const sheetIndex=Math.max(0,Math.min(Number(runtime.sheetIndex||0),sheetNames.length-1));
+    runtime.sheetIndex=sheetIndex;
+    const sheetName=sheetNames[sheetIndex];
+    const sheet=workbook.Sheets[sheetName];
+    const rows=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false,blankrows:true});
+    const ref=sheet?.["!ref"]||"A1";
+    let range;try{range=window.XLSX.utils.decode_range(ref);}catch(_){range={s:{r:0,c:0},e:{r:Math.max(0,rows.length-1),c:Math.max(0,...rows.map(r=>r.length-1),0)}};}
+    const totalRows=Math.max(rows.length,range.e.r+1);
+    const totalCols=Math.max(1,range.e.c+1,...rows.map(r=>Array.isArray(r)?r.length:0));
+    const maxRows=Math.min(totalRows,1000);
+    const maxCols=Math.min(totalCols,80);
+    const visibleRows=rows.slice(0,maxRows);
+    const header=`<thead><tr><th class="excel-corner"></th>${Array.from({length:maxCols},(_,i)=>`<th class="excel-col-head">${excelColumnLabel(i)}</th>`).join("")}</tr></thead>`;
+    const body=visibleRows.map((row,rowIndex)=>`<tr data-excel-row="${rowIndex}"><th class="excel-row-head">${rowIndex+1}</th>${Array.from({length:maxCols},(_,colIndex)=>{const value=Array.isArray(row)?row[colIndex]:"";const text=value==null?"":String(value);const ref=`${excelColumnLabel(colIndex)}${rowIndex+1}`;return `<td tabindex="0" data-excel-cell="${ref}" data-excel-value="${esc(text)}" title="${esc(text)}">${esc(text)}</td>`;}).join("")}</tr>`).join("");
+    content.innerHTML=`
+      <div class="excel-viewer-shell">
+        <div class="excel-viewer-head">
+          <div class="excel-file-mark" aria-hidden="true">X</div>
+          <div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${sheetNames.length} sheet${sheetNames.length===1?"":"s"} · ${totalRows.toLocaleString()} rows · ${totalCols.toLocaleString()} columns</span></div>
+          <span class="excel-local-badge">Local preview</span>
+          <label class="excel-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search this sheet" data-excel-search /></label>
+        </div>
+        <div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div>
+        <div class="excel-grid-wrap"><table class="excel-grid">${header}<tbody>${body}</tbody></table></div>
+        <div class="excel-footer">
+          <div class="excel-sheet-tabs">${sheetNames.map((name,i)=>`<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" type="button" data-excel-sheet="${i}"><span>${esc(name)}</span></button>`).join("")}</div>
+          <div class="excel-sheet-stats"><span>${Math.min(maxRows,totalRows).toLocaleString()} / ${totalRows.toLocaleString()} rows</span><span>${Math.min(maxCols,totalCols)} / ${totalCols} columns</span>${totalRows>1000||totalCols>80?'<span class="excel-limit-note">Preview limited for performance</span>':''}</div>
+        </div>
+      </div>`;
+    const search=$("[data-excel-search]",content);
+    search?.addEventListener("input",()=>{
+      const q=search.value.trim().toLowerCase();
+      $$("tbody tr",content).forEach(tr=>{const match=!q||tr.textContent.toLowerCase().includes(q);tr.classList.toggle("excel-row-hidden",!match);});
+    });
+    $$("[data-excel-sheet]",content).forEach(btn=>btn.addEventListener("click",()=>{runtime.sheetIndex=Number(btn.dataset.excelSheet||0);renderExcelWorkbook(doc,content);}));
+    $$("[data-excel-cell]",content).forEach(cell=>cell.addEventListener("click",()=>{
+      $$(".excel-grid td.is-selected",content).forEach(x=>x.classList.remove("is-selected"));
+      cell.classList.add("is-selected");
+      const name=$("[data-excel-name]",content);const formula=$("[data-excel-formula]",content);
+      if(name)name.textContent=cell.dataset.excelCell||"";if(formula)formula.textContent=cell.dataset.excelValue||"";
+    }));
+  }
+
+  window.previewExcelFile=async function(file,input){
+    try{
+      if(!file)return;
+      const lowerName=String(file.name||"").toLowerCase();
+      if(!lowerName.endsWith(".xlsx")&&!lowerName.endsWith(".xls")){toast("Please select an Excel .xlsx or .xls file");return;}
+      if(file.size>20*1024*1024){toast("File is too large for the preview. Maximum size is 20 MB");return;}
+      if(!window.XLSX){toast("Excel reader could not load. Check your connection and refresh TeamFlow.");return;}
+      const buffer=await file.arrayBuffer();
+      const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true});
+      const id=`excel-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+      runtimeExcelBooks.set(id,{workbook,sheetIndex:0});
+      state.documents.push({id,name:file.name,kind:"excel-local",size:file.size,createdAt:new Date().toISOString()});
+      activeDocId=id;
+      renderDocuments();
+      switchView("documents");
+      toast(`${file.name} opened in Excel preview`);
+    }catch(err){tfLogError("Excel preview failed",err,{name:file?.name,size:file?.size});toast(err?.message||"Could not open this Excel workbook");}
+    finally{if(input)input.value="";}
+  };
+
   function renderDocuments(){
     const list=$("#docList");
     const viewer=$("#docViewer");
 
     if(!state.documents.length){
       list.innerHTML='<div class="note" style="padding:10px">No documents yet.</div>';
-      viewer.innerHTML='<div class="doc-empty">Add an HTML page, PDF, SharePoint/Word link, or blank page.</div>';
+      viewer.innerHTML='<div class="doc-empty">Add an HTML page, PDF, Excel workbook, SharePoint/Word link, or blank page.</div>';
       return;
     }
     if(!state.documents.some(d=>d.id===activeDocId)) activeDocId=state.documents[0].id;
 
     list.innerHTML=state.documents.map(d=>`
       <button class="doc-item ${d.id===activeDocId?"active":""}" data-doc-id="${esc(d.id)}" type="button">
-        <span>${d.kind==="html"?"⌘":(d.kind==="pdf"||d.kind==="pdf-local")?"PDF":d.kind==="sharepoint"?"W":"＋"}</span>
+        <span class="${d.kind==="excel-local"?"doc-kind-excel":""}">${d.kind==="html"?"⌘":(d.kind==="pdf"||d.kind==="pdf-local")?"PDF":d.kind==="excel-local"?"XLS":d.kind==="sharepoint"?"W":"＋"}</span>
         <span class="doc-name">${esc(d.name)}</span>
       </button>
     `).join("");
@@ -641,6 +719,7 @@
         URL.revokeObjectURL(runtimeDocUrls.get(doc.id));
         runtimeDocUrls.delete(doc.id);
       }
+      runtimeExcelBooks.delete(doc.id);
       if(doc.storageKey){
         try{
           await window.teamFlowCloudFileRequest(`/documents/${encodeURIComponent(doc.id)}`,{method:"DELETE"});
@@ -686,6 +765,8 @@
       content.innerHTML=url
         ? `<iframe src="${esc(url)}" title="${esc(doc.name)}"></iframe>`
         : `<div class="doc-empty">This PDF was loaded only for the current browser session. Re-upload the PDF to preview it again.</div>`;
+    }else if(doc.kind==="excel-local"){
+      renderExcelWorkbook(doc,content);
     }else if(doc.kind==="sharepoint"){
       content.innerHTML=`<iframe src="${esc(doc.url)}" title="${esc(doc.name)}"></iframe>`;
     }else if(doc.kind==="blank"&&doc.storageKey){

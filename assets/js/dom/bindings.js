@@ -375,6 +375,14 @@
     await uploadWorkspaceDocument(input.files?.[0],"pdf",input);
   });
 
+  $("#excelUpload")?.addEventListener("change",async e=>{
+    const input=e.currentTarget;
+    const file=input.files?.[0];
+    if(!file)return;
+    if(typeof window.previewExcelFile!=="function"){toast("Excel preview is not available");input.value="";return;}
+    await window.previewExcelFile(file,input);
+  });
+
   $("#addWordLink").addEventListener("click",openSharePointModal);
 
   $("#addBlankPage").addEventListener("click",openBlankPageModal);

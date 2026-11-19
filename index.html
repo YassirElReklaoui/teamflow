@@ -5,16 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light dark" />
   <title>TeamFlow — Team Workspace</title>
-  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261119-progress-status-1" />
+  <link rel="stylesheet" href="./assets/css/teamflow.css?v=20261119-excel-preview-1" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
     <script src="./assets/js/services/api.js?v=20261118-settings-backup-1" defer></script>
   <script src="./assets/js/core/runtime.js?v=20261115-workspace-config-1" defer></script>
   <script src="./assets/js/services/domain.js?v=20261119-progress-status-1" defer></script>
   <script src="./assets/js/ui/views.js?v=20261119-progress-status-1" defer></script>
   <script src="./assets/js/ui/editors.js?v=20261119-progress-status-1" defer></script>
-  <script src="./assets/js/ui/documents.js?v=20261118-settings-backup-1" defer></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+  <script src="./assets/js/ui/documents.js?v=20261119-excel-preview-1" defer></script>
   <script src="./assets/js/ui/notifications.js?v=20261117-notify-docs-scroll-1" defer></script>
-  <script src="./assets/js/dom/bindings.js?v=20261118-settings-backup-1" defer></script>
+  <script src="./assets/js/dom/bindings.js?v=20261119-excel-preview-1" defer></script>
   <script src="./assets/js/bootstrap.js?v=20261115-settings-clearadmin-4" defer></script>
 </head>
 <body>
@@ -282,7 +283,7 @@
           <div class="page-head">
             <div>
               <h2>Documents / Imported Pages</h2>
-              <p class="panel-sub">Add HTML pages, preview PDFs, keep blank notes, or embed a Microsoft SharePoint / Word Online link when your tenant permits iframe embedding.</p>
+              <p class="panel-sub">Add HTML pages, preview PDFs and Excel workbooks, keep blank notes, or embed a Microsoft SharePoint / Word Online link when your tenant permits iframe embedding.</p>
             </div>
           </div>
           <div class="doc-actions">
@@ -290,6 +291,8 @@
             <input id="htmlUpload" class="file-input" type="file" accept=".html,.htm,text/html" />
             <label class="btn" for="pdfUpload" style="cursor:pointer">＋ PDF</label>
             <input id="pdfUpload" class="file-input" type="file" accept=".pdf,application/pdf" />
+            <label class="btn excel-preview-upload" for="excelUpload" style="cursor:pointer">＋ Excel</label>
+            <input id="excelUpload" class="file-input" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />
             <button class="btn" id="addWordLink" type="button">＋ Add SharePoint / Word</button>
             <button class="btn" id="addBlankPage" type="button">＋ Blank Page</button>
           </div>
