@@ -599,101 +599,151 @@
     let n=index+1,label="";while(n){const r=(n-1)%26;label=String.fromCharCode(65+r)+label;n=Math.floor((n-1)/26);}return label;
   }
 
-  function excelColor(color){
+  function excelJsColor(color){
     if(!color)return "";
-    const raw=String(color.rgb||color.RGB||"").replace(/^#/,'');
-    if(raw){const hex=raw.length===8?raw.slice(-6):raw.slice(-6);return /^[0-9a-f]{6}$/i.test(hex)?`#${hex}`:"";}
+    const raw=String(color.argb||color.rgb||"").replace(/^#/,'');
+    if(raw){const hex=raw.length===8?raw.slice(2):raw.slice(-6);return /^[0-9a-f]{6}$/i.test(hex)?`#${hex}`:"";}
     const indexed={0:"#000000",1:"#FFFFFF",2:"#FF0000",3:"#00FF00",4:"#0000FF",5:"#FFFF00",6:"#FF00FF",7:"#00FFFF",8:"#000000",9:"#FFFFFF",10:"#FF0000",11:"#00FF00",12:"#0000FF",13:"#FFFF00",14:"#FF00FF",15:"#00FFFF",16:"#800000",17:"#008000",18:"#000080",19:"#808000",20:"#800080",21:"#008080",22:"#C0C0C0",23:"#808080"};
     if(color.indexed!==undefined&&indexed[color.indexed]!==undefined)return indexed[color.indexed];
     return "";
   }
 
-  function excelResolvedStyle(workbook,cell){
-    if(!cell?.s)return null;
-    if(typeof cell.s==="object")return cell.s;
-    const styles=workbook?.Styles||workbook?.styles;
-    const xf=styles?.CellXf?.[cell.s]||styles?.cellXf?.[cell.s];
-    if(!xf)return null;
-    return {font:styles?.Fonts?.[xf.fontId],fill:styles?.Fills?.[xf.fillId],border:styles?.Borders?.[xf.borderId],alignment:xf.alignment||null};
-  }
-
-  function excelCellStyle(workbook,cell){
-    const s=excelResolvedStyle(workbook,cell);
-    if(!s)return "";
+  function excelJsCellStyle(cell){
+    if(!cell)return "";
     const css=[];
-    const fill=s.fill||s.Fill;
-    const fillColor=excelColor(fill?.fgColor||fill?.fgcolor||fill?.bgColor||fill?.bgcolor);
-    if(fillColor&&fill?.patternType!=="none")css.push(`background-color:${fillColor}`);
-    const font=s.font||s.Font;
-    const fontColor=excelColor(font?.color);
+    const fill=cell.fill||{};
+    if(fill.type==="pattern"&&fill.pattern&&fill.pattern!=="none"){
+      const bg=excelJsColor(fill.fgColor)||excelJsColor(fill.bgColor);
+      if(bg)css.push(`background-color:${bg}`);
+    }else if(fill.type==="gradient"&&Array.isArray(fill.stops)&&fill.stops.length){
+      const stops=fill.stops.map(s=>`${excelJsColor(s.color)||"transparent"} ${Math.round(Number(s.position||0)*100)}%`).join(",");
+      if(stops)css.push(`background:linear-gradient(90deg,${stops})`);
+    }
+    const font=cell.font||{};
+    const fontColor=excelJsColor(font.color);
     if(fontColor)css.push(`color:${fontColor}`);
-    if(font?.bold||font?.b)css.push("font-weight:700");
-    if(font?.italic||font?.i)css.push("font-style:italic");
-    if(font?.underline||font?.u)css.push("text-decoration:underline");
-    const alignment=s.alignment||s.Alignment;
-    if(alignment?.horizontal&&["left","center","right","justify"].includes(alignment.horizontal))css.push(`text-align:${alignment.horizontal}`);
-    if(alignment?.vertical&&["top","center","bottom"].includes(alignment.vertical))css.push(`vertical-align:${alignment.vertical==="center"?"middle":alignment.vertical}`);
-    if(alignment?.wrapText||alignment?.wrap)css.push("white-space:normal");
-    const border=s.border||s.Border;
-    for(const side of ["top","right","bottom","left"]){const b=border?.[side];const c=excelColor(b?.color);if(b?.style)css.push(`border-${side}:1px solid ${c||"#cbd5e1"}`);}
+    if(font.name)css.push(`font-family:${JSON.stringify(font.name)},Arial,sans-serif`);
+    if(font.size)css.push(`font-size:${Math.max(8,Math.min(24,Number(font.size)))}px`);
+    if(font.bold)css.push("font-weight:700");
+    if(font.italic)css.push("font-style:italic");
+    if(font.underline)css.push("text-decoration:underline");
+    const a=cell.alignment||{};
+    if(a.horizontal&&["left","center","right","justify"].includes(a.horizontal))css.push(`text-align:${a.horizontal}`);
+    if(a.vertical&&["top","middle","bottom"].includes(a.vertical))css.push(`vertical-align:${a.vertical}`);
+    if(a.wrapText)css.push("white-space:normal");
+    const border=cell.border||{};
+    for(const side of ["top","right","bottom","left"]){
+      const b=border?.[side]; if(!b?.style)continue;
+      const width=["medium","mediumDashed","mediumDashDot","mediumDashDotDot"].includes(b.style)?2:1;
+      const style=String(b.style).includes("dash")||String(b.style).includes("Dash")?"dashed":String(b.style).includes("dot")||String(b.style).includes("Dot")?"dotted":"solid";
+      css.push(`border-${side}:${width}px ${style} ${excelJsColor(b.color)||"#cbd5e1"}`);
+    }
     return css.join(";");
   }
 
-  function excelDisplayValue(cell){
+  function excelJsDisplayValue(cell){
     if(!cell)return "";
-    try{return cell.w!==undefined?String(cell.w):String(window.XLSX.utils.format_cell(cell)||"");}catch(_){return cell.v==null?"":String(cell.v);}
+    if(cell.text!==undefined&&cell.text!==null)return String(cell.text);
+    const value=cell.value;
+    if(value==null)return "";
+    if(value instanceof Date)return value.toLocaleDateString();
+    if(typeof value==="object"){
+      if(value.richText)return value.richText.map(x=>x.text||"").join("");
+      if(Object.prototype.hasOwnProperty.call(value,"result"))return String(value.result??"");
+      if(value.text)return String(value.text);
+      if(value.hyperlink)return String(value.text||value.hyperlink||"");
+    }
+    return String(value);
   }
 
-  function renderExcelWorkbook(doc,content){
-    const runtime=runtimeExcelBooks.get(doc.id);
-    if(!runtime?.workbook){
-      content.innerHTML=`<div class="doc-empty excel-missing"><strong>Excel preview is session-only.</strong><span>Choose the workbook again to preview it. Backend storage will be added after the viewer is approved.</span></div>`;
-      return;
-    }
-    const workbook=runtime.workbook;
-    const sheetNames=Array.isArray(workbook.SheetNames)?workbook.SheetNames:[];
-    if(!sheetNames.length){content.innerHTML='<div class="doc-empty">This workbook does not contain any worksheets.</div>';return;}
-    const sheetIndex=Math.max(0,Math.min(Number(runtime.sheetIndex||0),sheetNames.length-1));
+  function excelJsFormulaValue(cell){
+    const v=cell?.value;
+    if(v&&typeof v==="object"&&v.formula)return `=${v.formula}`;
+    return excelJsDisplayValue(cell);
+  }
+
+  function excelJsMergeMap(worksheet,maxRows,maxCols){
+    const masters=new Map(),covered=new Set();
+    const merges=worksheet?._merges;
+    if(!merges||typeof merges.forEach!=="function")return {masters,covered};
+    merges.forEach(range=>{
+      const m=range?.model||range;
+      const top=Number(m?.top||m?.s?.row||m?.s?.r+1||0),left=Number(m?.left||m?.s?.column||m?.s?.c+1||0),bottom=Number(m?.bottom||m?.e?.row||m?.e?.r+1||0),right=Number(m?.right||m?.e?.column||m?.e?.c+1||0);
+      if(!top||!left||!bottom||!right)return;
+      const rowSpan=Math.max(1,bottom-top+1),colSpan=Math.max(1,right-left+1);
+      masters.set(`${top}:${left}`,{rowSpan,colSpan});
+      for(let r=top;r<=bottom;r++)for(let c=left;c<=right;c++)if(r!==top||c!==left)covered.add(`${r}:${c}`);
+    });
+    return {masters,covered};
+  }
+
+  function renderExcelJsWorkbook(doc,content,runtime){
+    const workbook=runtime.excelWorkbook;
+    const worksheets=Array.isArray(workbook?.worksheets)?workbook.worksheets:[];
+    if(!worksheets.length){content.innerHTML='<div class="doc-empty">This workbook does not contain any worksheets.</div>';return;}
+    const sheetIndex=Math.max(0,Math.min(Number(runtime.sheetIndex||0),worksheets.length-1));
     runtime.sheetIndex=sheetIndex;
-    const sheetName=sheetNames[sheetIndex];
-    const sheet=workbook.Sheets[sheetName];
-    const rows=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false,blankrows:true});
-    const ref=sheet?.["!ref"]||"A1";
-    let range;try{range=window.XLSX.utils.decode_range(ref);}catch(_){range={s:{r:0,c:0},e:{r:Math.max(0,rows.length-1),c:Math.max(0,...rows.map(r=>r.length-1),0)}};}
-    const totalRows=Math.max(rows.length,range.e.r+1);
-    const totalCols=Math.max(1,range.e.c+1,...rows.map(r=>Array.isArray(r)?r.length:0));
-    const maxRows=Math.min(totalRows,1000);
-    const maxCols=Math.min(totalCols,80);
-    const visibleRows=rows.slice(0,maxRows);
-    const header=`<thead><tr><th class="excel-corner"></th>${Array.from({length:maxCols},(_,i)=>`<th class="excel-col-head">${excelColumnLabel(i)}</th>`).join("")}</tr></thead>`;
-    const body=visibleRows.map((row,rowIndex)=>`<tr data-excel-row="${rowIndex}"><th class="excel-row-head">${rowIndex+1}</th>${Array.from({length:maxCols},(_,colIndex)=>{const ref=`${excelColumnLabel(colIndex)}${rowIndex+1}`;const cell=sheet?.[ref];const text=cell?excelDisplayValue(cell):(Array.isArray(row)&&row[colIndex]!=null?String(row[colIndex]):"");const style=excelCellStyle(workbook,cell);const formula=cell?.f?`=${cell.f}`:text;return `<td tabindex="0" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" title="${esc(text)}"${style?` style="${esc(style)}"`:""}>${esc(text)}</td>`;}).join("")}</tr>`).join("");
+    const sheet=worksheets[sheetIndex];
+    const totalRows=Math.max(1,Number(sheet.actualRowCount||sheet.rowCount||1));
+    const totalCols=Math.max(1,Number(sheet.actualColumnCount||sheet.columnCount||1));
+    const maxRows=Math.min(totalRows,1000),maxCols=Math.min(totalCols,80);
+    const mergeInfo=excelJsMergeMap(sheet,maxRows,maxCols);
+    const header=`<thead><tr><th class="excel-corner"></th>${Array.from({length:maxCols},(_,i)=>{const col=sheet.getColumn(i+1);const width=Math.max(54,Math.min(320,Math.round(Number(col.width||12)*7.2)));return `<th class="excel-col-head" style="width:${width}px;min-width:${width}px">${excelColumnLabel(i)}</th>`;}).join("")}</tr></thead>`;
+    const body=Array.from({length:maxRows},(_,ri)=>{
+      const rowNumber=ri+1,row=sheet.getRow(rowNumber),height=row.height?` style="height:${Math.max(20,Number(row.height)*1.333)}px"`:"";
+      const cells=[];
+      for(let ci=1;ci<=maxCols;ci++){
+        if(mergeInfo.covered.has(`${rowNumber}:${ci}`))continue;
+        const cell=row.getCell(ci),ref=`${excelColumnLabel(ci-1)}${rowNumber}`,text=excelJsDisplayValue(cell),formula=excelJsFormulaValue(cell),style=excelJsCellStyle(cell),merge=mergeInfo.masters.get(`${rowNumber}:${ci}`);
+        const spans=`${merge?.rowSpan>1?` rowspan="${merge.rowSpan}"`:""}${merge?.colSpan>1?` colspan="${merge.colSpan}"`:""}`;
+        cells.push(`<td tabindex="0" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" title="${esc(text)}"${spans}${style?` style="${esc(style)}"`:""}>${esc(text)}</td>`);
+      }
+      return `<tr data-excel-row="${ri}"${height}><th class="excel-row-head">${rowNumber}</th>${cells.join("")}</tr>`;
+    }).join("");
     content.innerHTML=`
       <div class="excel-viewer-shell">
         <div class="excel-viewer-head">
           <div class="excel-file-mark" aria-hidden="true">X</div>
-          <div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${sheetNames.length} sheet${sheetNames.length===1?"":"s"} · ${totalRows.toLocaleString()} rows · ${totalCols.toLocaleString()} columns</span></div>
+          <div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${worksheets.length} sheet${worksheets.length===1?"":"s"} · ${totalRows.toLocaleString()} rows · ${totalCols.toLocaleString()} columns</span></div>
           <span class="excel-local-badge">Local preview</span>
           <label class="excel-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search this sheet" data-excel-search /></label>
         </div>
         <div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div>
         <div class="excel-grid-wrap"><table class="excel-grid">${header}<tbody>${body}</tbody></table></div>
         <div class="excel-footer">
-          <div class="excel-sheet-tabs">${sheetNames.map((name,i)=>`<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" type="button" data-excel-sheet="${i}"><span>${esc(name)}</span></button>`).join("")}</div>
-          <div class="excel-sheet-stats"><span>${Math.min(maxRows,totalRows).toLocaleString()} / ${totalRows.toLocaleString()} rows</span><span>${Math.min(maxCols,totalCols)} / ${totalCols} columns</span>${totalRows>1000||totalCols>80?'<span class="excel-limit-note">Preview limited for performance</span>':''}</div>
+          <div class="excel-sheet-tabs">${worksheets.map((ws,i)=>`<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" type="button" data-excel-sheet="${i}"><span>${esc(ws.name||`Sheet ${i+1}`)}</span></button>`).join("")}</div>
+          <div class="excel-sheet-stats"><span>${maxRows.toLocaleString()} / ${totalRows.toLocaleString()} rows</span><span>${maxCols} / ${totalCols} columns</span>${totalRows>1000||totalCols>80?'<span class="excel-limit-note">Preview limited for performance</span>':''}</div>
         </div>
       </div>`;
+    bindExcelViewerEvents(doc,content,runtime);
+  }
+
+  function renderSheetJsWorkbook(doc,content,runtime){
+    const workbook=runtime.workbook;
+    const sheetNames=Array.isArray(workbook?.SheetNames)?workbook.SheetNames:[];
+    if(!sheetNames.length){content.innerHTML='<div class="doc-empty">This workbook does not contain any worksheets.</div>';return;}
+    const sheetIndex=Math.max(0,Math.min(Number(runtime.sheetIndex||0),sheetNames.length-1));runtime.sheetIndex=sheetIndex;
+    const sheet=workbook.Sheets[sheetNames[sheetIndex]],rows=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false,blankrows:true});
+    const totalRows=Math.max(1,rows.length),totalCols=Math.max(1,...rows.map(r=>Array.isArray(r)?r.length:0)),maxRows=Math.min(totalRows,1000),maxCols=Math.min(totalCols,80);
+    const header=`<thead><tr><th class="excel-corner"></th>${Array.from({length:maxCols},(_,i)=>`<th class="excel-col-head">${excelColumnLabel(i)}</th>`).join("")}</tr></thead>`;
+    const body=rows.slice(0,maxRows).map((row,rowIndex)=>`<tr data-excel-row="${rowIndex}"><th class="excel-row-head">${rowIndex+1}</th>${Array.from({length:maxCols},(_,colIndex)=>{const ref=`${excelColumnLabel(colIndex)}${rowIndex+1}`,cell=sheet?.[ref],text=cell?.w!==undefined?String(cell.w):String(row?.[colIndex]??""),formula=cell?.f?`=${cell.f}`:text;return `<td tabindex="0" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" title="${esc(text)}">${esc(text)}</td>`;}).join("")}</tr>`).join("");
+    content.innerHTML=`<div class="excel-viewer-shell"><div class="excel-viewer-head"><div class="excel-file-mark">X</div><div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${sheetNames.length} sheets · ${totalRows} rows · ${totalCols} columns</span></div><span class="excel-local-badge">Legacy .xls preview</span><label class="excel-search"><input type="search" placeholder="Search this sheet" data-excel-search /></label></div><div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div><div class="excel-grid-wrap"><table class="excel-grid">${header}<tbody>${body}</tbody></table></div><div class="excel-footer"><div class="excel-sheet-tabs">${sheetNames.map((n,i)=>`<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" data-excel-sheet="${i}">${esc(n)}</button>`).join("")}</div></div></div>`;
+    bindExcelViewerEvents(doc,content,runtime);
+  }
+
+  function bindExcelViewerEvents(doc,content,runtime){
     const search=$("[data-excel-search]",content);
-    search?.addEventListener("input",()=>{
-      const q=search.value.trim().toLowerCase();
-      $$("tbody tr",content).forEach(tr=>{const match=!q||tr.textContent.toLowerCase().includes(q);tr.classList.toggle("excel-row-hidden",!match);});
-    });
+    search?.addEventListener("input",()=>{const q=search.value.trim().toLowerCase();$$("tbody tr",content).forEach(tr=>tr.classList.toggle("excel-row-hidden",!!q&&!tr.textContent.toLowerCase().includes(q)));});
     $$("[data-excel-sheet]",content).forEach(btn=>btn.addEventListener("click",()=>{runtime.sheetIndex=Number(btn.dataset.excelSheet||0);renderExcelWorkbook(doc,content);}));
-    $$("[data-excel-cell]",content).forEach(cell=>cell.addEventListener("click",()=>{
-      $$(".excel-grid td.is-selected",content).forEach(x=>x.classList.remove("is-selected"));
-      cell.classList.add("is-selected");
-      const name=$("[data-excel-name]",content);const formula=$("[data-excel-formula]",content);
-      if(name)name.textContent=cell.dataset.excelCell||"";if(formula)formula.textContent=cell.dataset.excelValue||"";
-    }));
+    $$("[data-excel-cell]",content).forEach(cell=>cell.addEventListener("click",()=>{$$(".excel-grid td.is-selected",content).forEach(x=>x.classList.remove("is-selected"));cell.classList.add("is-selected");const name=$("[data-excel-name]",content),formula=$("[data-excel-formula]",content);if(name)name.textContent=cell.dataset.excelCell||"";if(formula)formula.textContent=cell.dataset.excelValue||"";}));
+  }
+
+  function renderExcelWorkbook(doc,content){
+    const runtime=runtimeExcelBooks.get(doc.id);
+    if(!runtime){content.innerHTML=`<div class="doc-empty excel-missing"><strong>Excel preview is session-only.</strong><span>Choose the workbook again to preview it. Backend storage will be added after the viewer is approved.</span></div>`;return;}
+    if(runtime.excelWorkbook)return renderExcelJsWorkbook(doc,content,runtime);
+    if(runtime.workbook)return renderSheetJsWorkbook(doc,content,runtime);
+    content.innerHTML='<div class="doc-empty">This workbook could not be rendered.</div>';
   }
 
   window.previewExcelFile=async function(file,input){
@@ -702,16 +752,20 @@
       const lowerName=String(file.name||"").toLowerCase();
       if(!lowerName.endsWith(".xlsx")&&!lowerName.endsWith(".xls")){toast("Please select an Excel .xlsx or .xls file");return;}
       if(file.size>20*1024*1024){toast("File is too large for the preview. Maximum size is 20 MB");return;}
-      if(!window.XLSX){toast("Excel reader could not load. Check your connection and refresh TeamFlow.");return;}
       const buffer=await file.arrayBuffer();
-      const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true,cellStyles:true});
       const id=`excel-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
-      runtimeExcelBooks.set(id,{workbook,sheetIndex:0});
+      if(lowerName.endsWith(".xlsx")){
+        if(!window.ExcelJS?.Workbook){toast("Excel style reader could not load. Check your connection and refresh TeamFlow.");return;}
+        const workbook=new window.ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+        runtimeExcelBooks.set(id,{excelWorkbook:workbook,sheetIndex:0});
+      }else{
+        if(!window.XLSX){toast("Legacy Excel reader could not load. Check your connection and refresh TeamFlow.");return;}
+        const workbook=window.XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true});
+        runtimeExcelBooks.set(id,{workbook,sheetIndex:0});
+      }
       state.documents.push({id,name:file.name,kind:"excel-local",size:file.size,createdAt:new Date().toISOString()});
-      activeDocId=id;
-      renderDocuments();
-      switchView("documents");
-      toast(`${file.name} opened in Excel preview`);
+      activeDocId=id;renderDocuments();switchView("documents");toast(`${file.name} opened in Excel preview`);
     }catch(err){tfLogError("Excel preview failed",err,{name:file?.name,size:file?.size});toast(err?.message||"Could not open this Excel workbook");}
     finally{if(input)input.value="";}
   };
