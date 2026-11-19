@@ -756,8 +756,16 @@
       const id=`excel-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
       if(lowerName.endsWith(".xlsx")){
         if(!window.ExcelJS?.Workbook){toast("Excel style reader could not load. Check your connection and refresh TeamFlow.");return;}
-        const workbook=new window.ExcelJS.Workbook();
-        await workbook.xlsx.load(buffer);
+        let workbook=new window.ExcelJS.Workbook();
+        try{
+          await workbook.xlsx.load(buffer);
+        }catch(loadErr){
+          const msg=String(loadErr?.message||loadErr||"");
+          if(!/anchors|drawing/i.test(msg))throw loadErr;
+          tfLogError("ExcelJS drawing metadata skipped",loadErr,{name:file.name});
+          workbook=new window.ExcelJS.Workbook();
+          await workbook.xlsx.load(buffer,{ignoreNodes:["drawing","legacyDrawing","picture","extLst"]});
+        }
         runtimeExcelBooks.set(id,{excelWorkbook:workbook,sheetIndex:0});
       }else{
         if(!window.XLSX){toast("Legacy Excel reader could not load. Check your connection and refresh TeamFlow.");return;}
