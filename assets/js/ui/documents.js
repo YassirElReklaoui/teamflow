@@ -853,38 +853,79 @@
     return runtime.sheetState[sheetName]||(runtime.sheetState[sheetName]={filters:{},sort:null});
   }
 
+  function excelFilterKey(value){
+    return String(value??"").replace(/\u00a0/g," ").normalize("NFKC").trim().toLocaleLowerCase();
+  }
+
+  function excelFilterSet(stateForSheet,col){
+    if(!Object.prototype.hasOwnProperty.call(stateForSheet.filters||{},col))return null;
+    const current=stateForSheet.filters[col];
+    if(current instanceof Set){
+      const normalized=new Set([...current].map(excelFilterKey));
+      stateForSheet.filters[col]=normalized;
+      return normalized;
+    }
+    const normalized=new Set(Array.isArray(current)?current.map(excelFilterKey):[]);
+    stateForSheet.filters[col]=normalized;
+    return normalized;
+  }
+
   function renderSheetJsWorkbook(doc,content,runtime){
     const workbook=runtime.workbook,sheetNames=Array.isArray(workbook?.SheetNames)?workbook.SheetNames:[];
     if(!sheetNames.length){content.innerHTML='<div class="doc-empty">This workbook does not contain any worksheets.</div>';return;}
     const sheetIndex=Math.max(0,Math.min(Number(runtime.sheetIndex||0),sheetNames.length-1));runtime.sheetIndex=sheetIndex;
     const sheetName=sheetNames[sheetIndex],sheet=workbook.Sheets[sheetName],rows=window.XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false,blankrows:true});
-    const visual=runtime.ooxml?.sheets?.[sheetName]||null,stateForSheet=getExcelSheetState(runtime,sheetName),filterRange=excelFilterRange(visual);
+    const visual=runtime.ooxml?.sheets?.[sheetName]||null,stateForSheet=getExcelSheetState(runtime,sheetName),rawFilterRange=excelFilterRange(visual);
     const range=sheet?.["!ref"]?window.XLSX.utils.decode_range(sheet["!ref"]):null,totalRows=Math.max(1,range?range.e.r+1:rows.length),totalCols=Math.max(1,range?range.e.c+1:Math.max(0,...rows.map(r=>Array.isArray(r)?r.length:0))),maxRows=Math.min(totalRows,1000),maxCols=Math.min(totalCols,80);
+    const filterRange=rawFilterRange?{...rawFilterRange,endRow:Math.min(rawFilterRange.endRow,maxRows),endCol:Math.min(rawFilterRange.endCol,maxCols)}:null;
     const mergeInfo=mergeInfoFromRefs(visual?.merges||sheet?.["!merges"]?.map(m=>window.XLSX.utils.encode_range(m))||[]),hiddenRows=new Set(visual?.hiddenRows||[]),hiddenCols=new Set(visual?.hiddenCols||[]);
     const colWidths=Array.from({length:maxCols},(_,i)=>Math.max(54,Math.min(360,Math.round(Number(visual?.colWidths?.[i+1]||12)*7.2))));
     const visibleCols=Array.from({length:maxCols},(_,i)=>i+1).filter(c=>!hiddenCols.has(c));
-    let rowOrder=Array.from({length:maxRows},(_,i)=>i+1).filter(r=>!hiddenRows.has(r));
-    if(filterRange){const {startRow,endRow,startCol,endCol}=filterRange;rowOrder=rowOrder.filter(r=>{if(r<=startRow||r>endRow)return true;for(let c=startCol;c<=endCol;c++){const selected=stateForSheet.filters[c];if(selected&&selected.size&&!selected.has(excelCellText(sheet,rows,r,c)))return false;}return true;});if(stateForSheet.sort?.col){const fixed=rowOrder.filter(r=>r<=startRow||r>endRow),data=rowOrder.filter(r=>r>startRow&&r<=endRow);data.sort((ra,rb)=>excelValueCompare(excelCellText(sheet,rows,ra,stateForSheet.sort.col),excelCellText(sheet,rows,rb,stateForSheet.sort.col))*(stateForSheet.sort.dir==="desc"?-1:1));rowOrder=[...fixed.filter(r=>r<=startRow),...data,...fixed.filter(r=>r>endRow)];}}
+    // Excel stores rows hidden by an active AutoFilter with row hidden="1".
+    // Do not treat those as permanently hidden: TeamFlow should open the sheet
+    // with all filter-range data visible, then apply only filters chosen here.
+    let rowOrder=Array.from({length:maxRows},(_,i)=>i+1).filter(r=>{
+      if(!hiddenRows.has(r))return true;
+      return !!(filterRange&&r>filterRange.startRow&&r<=filterRange.endRow);
+    });
+    if(filterRange){const {startRow,endRow,startCol,endCol}=filterRange;rowOrder=rowOrder.filter(r=>{if(r<=startRow||r>endRow)return true;for(let c=startCol;c<=endCol;c++){const selected=excelFilterSet(stateForSheet,c);if(selected!==null&&!selected.has(excelFilterKey(excelCellText(sheet,rows,r,c))))return false;}return true;});if(stateForSheet.sort?.col){const fixed=rowOrder.filter(r=>r<=startRow||r>endRow),data=rowOrder.filter(r=>r>startRow&&r<=endRow);data.sort((ra,rb)=>excelValueCompare(excelCellText(sheet,rows,ra,stateForSheet.sort.col),excelCellText(sheet,rows,rb,stateForSheet.sort.col))*(stateForSheet.sort.dir==="desc"?-1:1));rowOrder=[...fixed.filter(r=>r<=startRow),...data,...fixed.filter(r=>r>endRow)];}}
     const header=`<thead><tr><th class="excel-corner"></th>${visibleCols.map(ci=>`<th class="excel-col-head" style="width:${colWidths[ci-1]}px;min-width:${colWidths[ci-1]}px">${excelColumnLabel(ci-1)}</th>`).join("")}</tr></thead>`;
     let visibleDataRows=0;
-    const body=rowOrder.map(rowNumber=>{if(filterRange&&rowNumber>filterRange.startRow&&rowNumber<=filterRange.endRow)visibleDataRows++;const height=visual?.rowHeights?.[rowNumber]?Math.max(20,Number(visual.rowHeights[rowNumber])*1.333):30,cells=[];for(const ci of visibleCols){if(mergeInfo.covered.has(`${rowNumber}:${ci}`))continue;const ref=`${excelColumnLabel(ci-1)}${rowNumber}`,cell=sheet?.[ref],text=excelCellText(sheet,rows,rowNumber,ci),formula=cell?.f?`=${cell.f}`:text,merge=mergeInfo.masters.get(`${rowNumber}:${ci}`);let style=ooxmlStyleCss(visual?.cellStyles?.[ref]);const spans=`${merge?.rowSpan>1?` rowspan="${merge.rowSpan}"`:""}${merge?.colSpan>1?` colspan="${merge.colSpan}"`:""}`;let freezeClass="",freezeStyle="";if(rowNumber<=Number(visual?.freezeRows||0)){freezeClass+=" excel-frozen-row";freezeStyle+=`position:sticky;top:${28+(rowNumber-1)*30}px;z-index:3;`;}if(ci<=Number(visual?.freezeCols||0)){freezeClass+=" excel-frozen-col";const left=48+colWidths.slice(0,ci-1).reduce((a,b)=>a+b,0);freezeStyle+=`position:sticky;left:${left}px;z-index:${rowNumber<=Number(visual?.freezeRows||0)?4:2};`;}const isFilter=filterRange&&rowNumber===filterRange.startRow&&ci>=filterRange.startCol&&ci<=filterRange.endCol,filterActive=!!stateForSheet.filters[ci]?.size||stateForSheet.sort?.col===ci;const contentHtml=isFilter?`<span class="excel-filter-head-label">${esc(text)}</span><button type="button" class="excel-filter-btn ${filterActive?"active":""}" data-excel-filter-col="${ci}" title="Filter / sort ${esc(text)}">${filterActive?"●":"▾"}</button>`:esc(text);cells.push(`<td tabindex="0" class="${freezeClass.trim()} ${isFilter?"excel-filter-head":""}" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" data-excel-row-number="${rowNumber}" data-excel-col-number="${ci}" title="${esc(text)}"${spans} style="${esc(`${style}${style&&freezeStyle?";":""}${freezeStyle}`)}">${contentHtml}</td>`);}return `<tr data-excel-row="${rowNumber}" style="height:${height}px"><th class="excel-row-head">${rowNumber}</th>${cells.join("")}</tr>`;}).join("");
+    const body=rowOrder.map(rowNumber=>{if(filterRange&&rowNumber>filterRange.startRow&&rowNumber<=filterRange.endRow)visibleDataRows++;const height=visual?.rowHeights?.[rowNumber]?Math.max(20,Number(visual.rowHeights[rowNumber])*1.333):30,cells=[];for(const ci of visibleCols){if(mergeInfo.covered.has(`${rowNumber}:${ci}`))continue;const ref=`${excelColumnLabel(ci-1)}${rowNumber}`,cell=sheet?.[ref],text=excelCellText(sheet,rows,rowNumber,ci),formula=cell?.f?`=${cell.f}`:text,merge=mergeInfo.masters.get(`${rowNumber}:${ci}`);let style=ooxmlStyleCss(visual?.cellStyles?.[ref]);const spans=`${merge?.rowSpan>1?` rowspan="${merge.rowSpan}"`:""}${merge?.colSpan>1?` colspan="${merge.colSpan}"`:""}`;let freezeClass="",freezeStyle="";if(rowNumber<=Number(visual?.freezeRows||0)){freezeClass+=" excel-frozen-row";freezeStyle+=`position:sticky;top:${28+(rowNumber-1)*30}px;z-index:3;`;}if(ci<=Number(visual?.freezeCols||0)){freezeClass+=" excel-frozen-col";const left=48+colWidths.slice(0,ci-1).reduce((a,b)=>a+b,0);freezeStyle+=`position:sticky;left:${left}px;z-index:${rowNumber<=Number(visual?.freezeRows||0)?4:2};`;}const isFilter=filterRange&&rowNumber===filterRange.startRow&&ci>=filterRange.startCol&&ci<=filterRange.endCol,filterActive=Object.prototype.hasOwnProperty.call(stateForSheet.filters||{},ci)||stateForSheet.sort?.col===ci;const contentHtml=isFilter?`<span class="excel-filter-head-label">${esc(text)}</span><button type="button" class="excel-filter-btn ${filterActive?"active":""}" data-excel-filter-col="${ci}" title="Filter / sort ${esc(text)}">${filterActive?"●":"▾"}</button>`:esc(text);cells.push(`<td tabindex="0" class="${freezeClass.trim()} ${isFilter?"excel-filter-head":""}" data-excel-cell="${ref}" data-excel-value="${esc(formula)}" data-excel-row-number="${rowNumber}" data-excel-col-number="${ci}" title="${esc(text)}"${spans} style="${esc(`${style}${style&&freezeStyle?";":""}${freezeStyle}`)}">${contentHtml}</td>`);}return `<tr data-excel-row="${rowNumber}" style="height:${height}px"><th class="excel-row-head">${rowNumber}</th>${cells.join("")}</tr>`;}).join("");
     const filterSummary=filterRange?`<span>${visibleDataRows} / ${Math.max(0,Math.min(maxRows,filterRange.endRow)-filterRange.startRow)} filtered rows</span>`:"";
     content.innerHTML=`<div class="excel-viewer-shell"><div class="excel-viewer-head"><div class="excel-file-mark">X</div><div class="excel-workbook-meta"><strong>${esc(doc.name)}</strong><span>${sheetNames.length} sheet${sheetNames.length===1?"":"s"} · ${totalRows.toLocaleString()} rows · ${totalCols.toLocaleString()} columns</span></div><span class="excel-local-badge">${doc.storageKey?"Shared workbook":"Local preview"}</span><label class="excel-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search this sheet" data-excel-search /></label></div><div class="excel-formula-bar"><span class="excel-name-box" data-excel-name>A1</span><span class="excel-fx">fx</span><div class="excel-formula-value" data-excel-formula>Select a cell to inspect its value</div></div><div class="excel-grid-wrap"><table class="excel-grid">${header}<tbody>${body}</tbody></table></div><div class="excel-footer"><div class="excel-sheet-tabs">${sheetNames.map((n,i)=>{const tabColor=runtime.ooxml?.sheets?.[n]?.tabColor||"";return `<button class="excel-sheet-tab ${i===sheetIndex?"active":""}" data-excel-sheet="${i}"${tabColor?` style="--excel-tab-color:${esc(tabColor)}"`:""}>${tabColor?'<i class="excel-tab-dot"></i>':""}<span>${esc(n)}</span></button>`;}).join("")}</div><div class="excel-sheet-stats">${filterSummary}<span>${rowOrder.length.toLocaleString()} visible rows</span><span>${visibleCols.length} / ${totalCols} columns</span>${totalRows>1000||totalCols>80?'<span class="excel-limit-note">Preview limited for performance</span>':""}</div></div><div class="excel-filter-menu" data-excel-filter-menu hidden></div></div>`;
     bindExcelViewerEvents(doc,content,runtime,{sheetName,sheet,rows,visual,filterRange});
   }
 
   function openExcelFilterMenu(content,runtime,ctx,col,button){
-    const {sheetName,sheet,rows,filterRange}=ctx;if(!filterRange)return;const stateForSheet=getExcelSheetState(runtime,sheetName),values=[];
-    for(let r=filterRange.startRow+1;r<=filterRange.endRow;r++){const v=excelCellText(sheet,rows,r,col);if(!values.includes(v))values.push(v);}values.sort(excelValueCompare);
-    const active=stateForSheet.filters[col],selected=active?new Set(active):new Set(values),menu=$("[data-excel-filter-menu]",content);if(!menu)return;
-    menu.innerHTML=`<div class="excel-filter-menu-head"><strong>${esc(excelCellText(sheet,rows,filterRange.startRow,col)||excelColumnLabel(col-1))}</strong><button type="button" data-filter-close>×</button></div><div class="excel-filter-sort"><button type="button" data-filter-sort="asc">↑ Sort A → Z</button><button type="button" data-filter-sort="desc">↓ Sort Z → A</button></div><label class="excel-filter-search"><span>⌕</span><input type="search" placeholder="Search values" data-filter-search></label><div class="excel-filter-actions"><button type="button" data-filter-select-all>Select all</button><button type="button" data-filter-clear>Clear</button></div><div class="excel-filter-values">${values.map((v,i)=>`<label data-filter-value-row><input type="checkbox" value="${esc(v)}" ${selected.has(v)?"checked":""}><span>${esc(v||"(Blank)")}</span></label>`).join("")}</div><div class="excel-filter-menu-foot"><button type="button" class="btn small" data-filter-cancel>Cancel</button><button type="button" class="btn small primary" data-filter-apply>Apply</button></div>`;
-    menu.hidden=false;const rect=button.getBoundingClientRect();menu.style.left=`${Math.min(window.innerWidth-300,Math.max(8,rect.left))}px`;menu.style.top=`${Math.min(window.innerHeight-390,rect.bottom+4)}px`;
-    const close=()=>{menu.hidden=true;};$("[data-filter-close]",menu)?.addEventListener("click",close);$("[data-filter-cancel]",menu)?.addEventListener("click",close);
+    const {sheetName,sheet,rows,filterRange}=ctx;if(!filterRange)return;
+    const stateForSheet=getExcelSheetState(runtime,sheetName),valueMap=new Map();
+    for(let r=filterRange.startRow+1;r<=filterRange.endRow;r++){
+      const display=excelCellText(sheet,rows,r,col),key=excelFilterKey(display);
+      if(!valueMap.has(key))valueMap.set(key,display);
+    }
+    const entries=[...valueMap.entries()].sort((a,b)=>excelValueCompare(a[1],b[1]));
+    const values=entries.map(([,display])=>display),allKeys=new Set(entries.map(([key])=>key));
+    const active=excelFilterSet(stateForSheet,col),selected=active===null?new Set(allKeys):new Set(active);
+    const menu=$("[data-excel-filter-menu]",content);if(!menu)return;
+    menu.innerHTML=`<div class="excel-filter-menu-head"><strong>${esc(excelCellText(sheet,rows,filterRange.startRow,col)||excelColumnLabel(col-1))}</strong><button type="button" data-filter-close>×</button></div><div class="excel-filter-sort"><button type="button" data-filter-sort="asc">↑ Sort A → Z</button><button type="button" data-filter-sort="desc">↓ Sort Z → A</button></div><label class="excel-filter-search"><span>⌕</span><input type="search" placeholder="Search values" data-filter-search></label><div class="excel-filter-actions"><button type="button" data-filter-select-all>Select all</button><button type="button" data-filter-clear>Clear</button></div><div class="excel-filter-values">${entries.map(([key,display])=>`<label data-filter-value-row><input type="checkbox" data-filter-key="${esc(key)}" ${selected.has(key)?"checked":""}><span>${esc(display||"(Blank)")}</span></label>`).join("")}</div><div class="excel-filter-menu-foot"><button type="button" class="btn small" data-filter-cancel>Cancel</button><button type="button" class="btn small primary" data-filter-apply>Apply</button></div>`;
+    menu.hidden=false;
+    const rect=button.getBoundingClientRect();
+    menu.style.left=`${Math.min(window.innerWidth-308,Math.max(8,rect.left))}px`;
+    menu.style.top=`${Math.max(8,Math.min(rect.bottom+4,window.innerHeight-420))}px`;
+    requestAnimationFrame(()=>{const box=menu.getBoundingClientRect();if(box.bottom>window.innerHeight-8)menu.style.top=`${Math.max(8,window.innerHeight-box.height-8)}px`;if(box.right>window.innerWidth-8)menu.style.left=`${Math.max(8,window.innerWidth-box.width-8)}px`;});
+    const close=()=>{menu.hidden=true;};
+    $("[data-filter-close]",menu)?.addEventListener("click",close);$("[data-filter-cancel]",menu)?.addEventListener("click",close);
     $("[data-filter-search]",menu)?.addEventListener("input",e=>{const q=String(e.target.value||"").toLowerCase();$$('[data-filter-value-row]',menu).forEach(row=>row.hidden=!!q&&!row.textContent.toLowerCase().includes(q));});
-    $("[data-filter-select-all]",menu)?.addEventListener("click",()=>$$('input[type="checkbox"]',menu).forEach(x=>{if(!x.closest('[data-filter-value-row]')?.hidden)x.checked=true;}));
-    $("[data-filter-clear]",menu)?.addEventListener("click",()=>$$('input[type="checkbox"]',menu).forEach(x=>x.checked=false));
+    $("[data-filter-select-all]",menu)?.addEventListener("click",()=>$$('[data-filter-value-row]',menu).forEach(row=>{if(!row.hidden){const input=$("input[type=checkbox]",row);if(input)input.checked=true;}}));
+    $("[data-filter-clear]",menu)?.addEventListener("click",()=>$$('[data-filter-value-row] input[type=checkbox]',menu).forEach(x=>x.checked=false));
     $$('[data-filter-sort]',menu).forEach(b=>b.addEventListener("click",()=>{stateForSheet.sort={col,dir:b.dataset.filterSort};close();renderExcelWorkbook({id:runtime.docId||"",name:runtime.docName||"Workbook"},content);}));
-    $("[data-filter-apply]",menu)?.addEventListener("click",()=>{const checked=new Set($$('input[type="checkbox"]:checked',menu).map(x=>x.value));if(checked.size===values.length)delete stateForSheet.filters[col];else stateForSheet.filters[col]=checked;close();renderExcelWorkbook({id:runtime.docId||"",name:runtime.docName||"Workbook"},content);});
+    $("[data-filter-apply]",menu)?.addEventListener("click",()=>{
+      const checked=new Set($$('[data-filter-value-row] input[type=checkbox]:checked',menu).map(x=>String(x.dataset.filterKey||"")));
+      if(checked.size===allKeys.size&&[...allKeys].every(k=>checked.has(k)))delete stateForSheet.filters[col];
+      else stateForSheet.filters[col]=checked;
+      close();renderExcelWorkbook({id:runtime.docId||"",name:runtime.docName||"Workbook"},content);
+    });
   }
 
   function bindExcelViewerEvents(doc,content,runtime,ctx){
@@ -1067,3 +1108,4 @@
       renderRichBlankEditor(doc,content);
     }
   }
+
